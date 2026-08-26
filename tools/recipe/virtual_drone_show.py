@@ -10,8 +10,10 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
+import json
 import os
 import platform
+import subprocess
 import sys
 from pathlib import Path
 
@@ -176,9 +178,50 @@ def _viewer_root(requested: Path | None) -> Path:
     return (SHOW_ROOT.parent / "hakoniwa-threejs-drone").resolve()
 
 
+def _require_terminated_launcher_for_configure() -> None:
+    foundation = base.load_foundation_module()
+    paths = foundation.resolve_workspace(base.ROOT, base.RECIPE_ID)
+    session = base.session_file(paths)
+    if not session.is_file():
+        return
+    try:
+        command = base._launcher_command(paths, platform.system(), "status")
+        completed = subprocess.run(
+            command,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=5.0,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise base.RecipeError(
+            f"configure refused: could not inspect Launcher session: {session}"
+        ) from exc
+    if completed.returncode != 0:
+        detail = completed.stderr.strip() or completed.stdout.strip() or "unknown error"
+        raise base.RecipeError(
+            "configure refused: Launcher status check failed: "
+            f"{detail}; session={session}"
+        )
+    try:
+        status = json.loads(completed.stdout.strip().splitlines()[-1])
+        state = status.get("state")
+    except (IndexError, json.JSONDecodeError, AttributeError) as exc:
+        raise base.RecipeError(
+            f"configure refused: invalid Launcher status response: {session}"
+        ) from exc
+    if state != "TERMINATED":
+        raise base.RecipeError(
+            "configure refused: Launcher session must be TERMINATED "
+            f"(current={state or 'UNKNOWN'}): {session}; "
+            "run 'python3 tools/recipe/virtual_drone_show.py stop' first"
+        )
+
+
 def configure(args: argparse.Namespace, experiment_path: Path, drone_root: Path) -> int:
     if args.mujoco_city_world is None:
         raise base.RecipeError("configure requires --mujoco-city-world")
+    _require_terminated_launcher_for_configure()
     city_world = args.mujoco_city_world.expanduser().resolve()
     rc = base.configure(
         experiment_path,

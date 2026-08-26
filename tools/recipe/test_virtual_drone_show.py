@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import io
+import json
 import sys
 import tempfile
 import unittest
@@ -42,6 +43,65 @@ class VirtualDroneShowTest(unittest.TestCase):
         self.assertEqual(result, 2)
         self.assertIn("configure requires --mujoco-city-world", stderr.getvalue())
 
+    def test_configure_refuses_non_terminated_launcher_session(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            session = root / "runtime" / "launcher-session.json"
+            session.parent.mkdir()
+            session.write_text(
+                json.dumps({"state": "RUNNING"}) + "\n", encoding="utf-8"
+            )
+            paths = SimpleNamespace(recipe_root=root)
+            foundation = SimpleNamespace(
+                resolve_workspace=mock.Mock(return_value=paths)
+            )
+            status = SimpleNamespace(
+                returncode=0,
+                stdout=json.dumps({"state": "RUNNING"}) + "\n",
+                stderr="",
+            )
+            with (
+                mock.patch.object(
+                    recipe.base, "load_foundation_module", return_value=foundation
+                ),
+                mock.patch.object(
+                    recipe.base, "_launcher_command", return_value=["launcher-status"]
+                ),
+                mock.patch.object(recipe.subprocess, "run", return_value=status),
+            ):
+                with self.assertRaisesRegex(
+                    recipe.base.RecipeError, "must be TERMINATED.*current=RUNNING"
+                ):
+                    recipe._require_terminated_launcher_for_configure()
+
+    def test_configure_accepts_terminated_launcher_session(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            session = root / "runtime" / "launcher-session.json"
+            session.parent.mkdir()
+            session.write_text(
+                json.dumps({"state": "TERMINATED"}) + "\n", encoding="utf-8"
+            )
+            paths = SimpleNamespace(recipe_root=root)
+            foundation = SimpleNamespace(
+                resolve_workspace=mock.Mock(return_value=paths)
+            )
+            status = SimpleNamespace(
+                returncode=0,
+                stdout=json.dumps({"state": "TERMINATED"}) + "\n",
+                stderr="",
+            )
+            with (
+                mock.patch.object(
+                    recipe.base, "load_foundation_module", return_value=foundation
+                ),
+                mock.patch.object(
+                    recipe.base, "_launcher_command", return_value=["launcher-status"]
+                ),
+                mock.patch.object(recipe.subprocess, "run", return_value=status),
+            ):
+                recipe._require_terminated_launcher_for_configure()
+
     def test_configure_materializes_city_extension_after_base_recipe(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -52,7 +112,7 @@ class VirtualDroneShowTest(unittest.TestCase):
             launcher = recipe_config / "launcher.json"
             launcher.write_text("{}\n", encoding="utf-8")
             experiment = SimpleNamespace(drone_count=128, process_count=6)
-            paths = SimpleNamespace(recipe_config=recipe_config)
+            paths = SimpleNamespace(recipe_config=recipe_config, recipe_root=root)
             foundation = SimpleNamespace(
                 resolve_workspace=mock.Mock(return_value=paths)
             )

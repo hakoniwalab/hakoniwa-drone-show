@@ -86,6 +86,7 @@ python3 tools/recipe/virtual_drone_show.py stop
 
 configureはFleet分割、MuJoCoモデル、Show IR、Launcher設定を再生成します。稼働中の
 workspaceへconfigureを重ねず、先にRecipe所有Launcherを正規終了してください。
+operatorも既存session fileを確認し、状態が`TERMINATED`でなければconfigureを拒否します。
 `stop`はLauncher control endpointへ`terminate`を送り、管理アセットをcleanupします。
 シミュレーション状態だけを変更する`hako-cmd stop`の代用ではありません。
 
