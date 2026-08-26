@@ -5,7 +5,8 @@ SVG Formation、実行順、移動時間、待機時間、LEDを1つのJSONに�
 Formation JSON、Resolved Show Plan、Show IRを直接編集させないためのファサードであり、
 ショー制作におけるユーザ入力の正本です。
 
-既定の例は`shows/three-face.show.json`です。
+既定の例は`shows/kids-space-adventure.show.json`です。以前の3顔デモは
+`shows/three-face.show.json`として残しています。
 
 ```json
 {

@@ -25,7 +25,7 @@ viewer:
     fov_deg: 55.0
 
 scenario:
-  show_file: ../../shows/three-face.show.json
+  show_file: ../../shows/kids-space-adventure.show.json
   formation:
     scale_m: 20
     audience_tilt_deg: -60.0

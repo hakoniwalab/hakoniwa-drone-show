@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 160"
+     fill="none" stroke="#111827" stroke-width="3" stroke-linejoin="round">
+  <title>Child-friendly T-Rex side silhouette</title>
+  <polygon id="body" data-led-role="body" data-weight="0.86"
+           points="8,81 40,64 72,51 105,47 121,34 151,23 194,29 211,43 184,49 211,59 198,72 166,69 147,80 131,96 145,132 128,134 110,102 95,111 81,136 62,136 72,105 48,100 25,93"/>
+  <circle id="eye" data-led-role="eyes" data-weight="0.06" cx="174" cy="40" r="4"/>
+  <polyline id="arm" data-led-role="accent" data-weight="0.08"
+            points="130,72 143,86 157,82"/>
+</svg>

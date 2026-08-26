@@ -1,0 +1,92 @@
+{
+  "schema_version": "1.0",
+  "show_id": "kids-space-adventure",
+  "title": "ネコと宇宙の大冒険",
+  "assignment": {
+    "strategy": "nearest-greedy"
+  },
+  "formations": [
+    {
+      "formation_id": "cat-face",
+      "title": "Cat face",
+      "svg": "../assets/formations/cat-ear-face.svg"
+    },
+    {
+      "formation_id": "t-rex",
+      "title": "T-Rex",
+      "svg": "../assets/formations/t-rex.svg"
+    },
+    {
+      "formation_id": "rocket",
+      "title": "Rocket",
+      "svg": "../assets/formations/rocket.svg"
+    },
+    {
+      "formation_id": "ufo-alien",
+      "title": "UFO and alien",
+      "svg": "../assets/formations/ufo-alien.svg"
+    },
+    {
+      "formation_id": "ai-robot",
+      "title": "Cute AI robot",
+      "svg": "../assets/formations/ai-robot.svg"
+    }
+  ],
+  "timeline": [
+    {
+      "step_id": "hello-cat",
+      "formation_id": "cat-face",
+      "transition_sec": 6.0,
+      "hold_sec": 10.0,
+      "led": {
+        "effect": "steady",
+        "rgb": [255, 96, 176],
+        "brightness": 1.0
+      }
+    },
+    {
+      "step_id": "meet-t-rex",
+      "formation_id": "t-rex",
+      "transition_sec": 6.0,
+      "hold_sec": 10.0,
+      "led": {
+        "effect": "steady",
+        "rgb": [72, 255, 120],
+        "brightness": 1.0
+      }
+    },
+    {
+      "step_id": "launch-rocket",
+      "formation_id": "rocket",
+      "transition_sec": 6.0,
+      "hold_sec": 10.0,
+      "led": {
+        "effect": "steady",
+        "rgb": [176, 224, 255],
+        "brightness": 1.0
+      }
+    },
+    {
+      "step_id": "meet-alien",
+      "formation_id": "ufo-alien",
+      "transition_sec": 6.0,
+      "hold_sec": 10.0,
+      "led": {
+        "effect": "steady",
+        "rgb": [192, 96, 255],
+        "brightness": 1.0
+      }
+    },
+    {
+      "step_id": "future-friend",
+      "formation_id": "ai-robot",
+      "transition_sec": 6.0,
+      "hold_sec": 10.0,
+      "led": {
+        "effect": "steady",
+        "rgb": [255, 220, 72],
+        "brightness": 1.0
+      }
+    }
+  ]
+}

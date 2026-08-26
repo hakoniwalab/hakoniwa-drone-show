@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 220"
+     fill="none" stroke="#111827" stroke-width="3" stroke-linejoin="round">
+  <title>Child-friendly rocket</title>
+  <path id="body" data-led-role="body" data-weight="0.54"
+        d="M 80 8 Q 52 34 52 103 Q 52 132 65 151 L 95 151 Q 108 132 108 103 Q 108 34 80 8 Z"/>
+  <circle id="window" data-led-role="window" data-weight="0.12" cx="80" cy="72" r="17"/>
+  <polygon id="left-fin" data-led-role="fins" data-weight="0.10"
+           points="53,112 27,151 62,145"/>
+  <polygon id="right-fin" data-led-role="fins" data-weight="0.10"
+           points="107,112 133,151 98,145"/>
+  <polyline id="outer-flame" data-led-role="flame" data-weight="0.09"
+            points="65,154 57,184 71,176 80,212 89,176 103,184 95,154"/>
+  <polyline id="inner-flame" data-led-role="flame-core" data-weight="0.05"
+            points="73,157 80,190 87,157"/>
+</svg>

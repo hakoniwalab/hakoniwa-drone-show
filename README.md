@@ -147,7 +147,7 @@ Show Plan、Show IRを直接編集する必要はありません。
 既定の入力は次のファイルです。
 
 - SVG: [`assets/formations/`](assets/formations/)
-- Show File: [`shows/three-face.show.json`](shows/three-face.show.json)
+- Show File: [`shows/kids-space-adventure.show.json`](shows/kids-space-adventure.show.json)
 - City experiment: [`recipes/experiments/virtual-drone-show-city.yaml`](recipes/experiments/virtual-drone-show-city.yaml)
 
 `configure`は`scale.drone_count`を使い、入力から実行用成果物までを自動生成します。
@@ -171,6 +171,11 @@ SVGとShow Fileは機体数非依存です。Formation JSON、Resolved Show Plan
 
 Show Fileの形式と新しいショーへの切り替え手順は
 [`docs/show-file-v1.md`](docs/show-file-v1.md)を参照してください。
+
+既定のShow Fileは、180機向けの子供向け演目「ネコと宇宙の大冒険」です。ネコ、
+T-Rex、ロケット、UFOと宇宙人、AIロボットを順番に表示します。以前の3顔デモも
+[`shows/three-face.show.json`](shows/three-face.show.json)として残してあり、
+`scenario.show_file`を変更すれば切り替えられます。
 
 ## Show toolchain v0.1
 

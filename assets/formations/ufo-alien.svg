@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 210"
+     fill="none" stroke="#111827" stroke-width="3">
+  <title>Funny UFO and alien</title>
+  <ellipse id="dome" data-led-role="dome" data-weight="0.17"
+           cx="110" cy="53" rx="48" ry="28"/>
+  <ellipse id="saucer" data-led-role="ufo-body" data-weight="0.31"
+           cx="110" cy="80" rx="95" ry="27"/>
+  <circle id="left-light" data-led-role="lights" data-weight="0.04" cx="55" cy="84" r="6"/>
+  <circle id="center-light" data-led-role="lights" data-weight="0.04" cx="110" cy="91" r="6"/>
+  <circle id="right-light" data-led-role="lights" data-weight="0.04" cx="165" cy="84" r="6"/>
+  <ellipse id="alien-head" data-led-role="alien" data-weight="0.25"
+           cx="110" cy="153" rx="48" ry="40"/>
+  <ellipse id="left-eye" data-led-role="alien-eyes" data-weight="0.055"
+           cx="91" cy="148" rx="7" ry="13"/>
+  <ellipse id="right-eye" data-led-role="alien-eyes" data-weight="0.055"
+           cx="129" cy="148" rx="7" ry="13"/>
+  <path id="smile" data-led-role="mouth" data-weight="0.035"
+        d="M 94 172 Q 110 184 126 172"/>
+</svg>
