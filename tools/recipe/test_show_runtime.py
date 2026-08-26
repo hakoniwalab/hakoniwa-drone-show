@@ -15,6 +15,11 @@ def write_json(path: Path, value) -> None:
 
 
 class ShowRuntimeTest(unittest.TestCase):
+    def test_signed_audience_tilt_keeps_formation_side(self) -> None:
+        self.assertEqual(show_runtime._show_plan_tilt_from_audience(60.0), 30.0)
+        self.assertEqual(show_runtime._show_plan_tilt_from_audience(-60.0), -30.0)
+        self.assertEqual(show_runtime._show_plan_tilt_from_audience(0.0), 90.0)
+
     def test_asset_pdudef_extension_is_idempotent(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -210,6 +215,10 @@ class ShowRuntimeTest(unittest.TestCase):
                                 "pitch_deg": 35.0,
                                 "fov_deg": 55.0,
                             },
+                            "led_appearance": {
+                                "scale": 2.0,
+                                "intensity": 1.75,
+                            },
                         }
                     },
                     "city_world": {
@@ -253,7 +262,7 @@ class ShowRuntimeTest(unittest.TestCase):
                 },
             )
             self.assertEqual(
-                runtime["led_appearance"], {"scale": 1.45, "intensity": 1.25}
+                runtime["led_appearance"], {"scale": 2.0, "intensity": 1.75}
             )
             self.assertEqual(
                 runtime["camera"],

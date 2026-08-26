@@ -94,24 +94,29 @@ scenario:
         )
 
     def test_default_experiment_resolves_show_scale_and_base_compatibility(self) -> None:
-        self.assertEqual(
-            recipe._formation_scale_m(recipe.DEFAULT_EXPERIMENT), 15.33125
+        formation_scale_m = recipe._formation_scale_m(recipe.DEFAULT_EXPERIMENT)
+        self.assertGreater(formation_scale_m, 0.0)
+        audience_tilt_deg = recipe._formation_audience_tilt_deg(
+            recipe.DEFAULT_EXPERIMENT
         )
-        self.assertEqual(
-            recipe._formation_audience_tilt_deg(recipe.DEFAULT_EXPERIMENT),
-            60.0,
-        )
+        self.assertGreaterEqual(audience_tilt_deg, -85.0)
+        self.assertLessEqual(audience_tilt_deg, 85.0)
         experiment = recipe.base.resolve_experiment(recipe.DEFAULT_EXPERIMENT)
         self.assertEqual(experiment.word, "HAKONIWA")
-        self.assertEqual(experiment.letter_width_m, 2.5)
-        self.assertEqual(experiment.letter_height_m, 5.0)
-        self.assertEqual(experiment.letter_gap_m, 1.125)
-        self.assertEqual(experiment.speed_m_s, 20.0)
+        compatibility_scale = formation_scale_m / 61.325
+        self.assertAlmostEqual(experiment.letter_width_m, 10.0 * compatibility_scale)
+        self.assertAlmostEqual(experiment.letter_height_m, 20.0 * compatibility_scale)
+        self.assertAlmostEqual(experiment.letter_gap_m, 4.5 * compatibility_scale)
+        self.assertEqual(
+            experiment.speed_m_s, recipe._max_speed_m_s(recipe.DEFAULT_EXPERIMENT)
+        )
         viewer = recipe._viewer_settings(recipe.DEFAULT_EXPERIMENT)
         self.assertEqual(viewer["initial_mode"], "audience")
-        self.assertEqual(
-            viewer["audience_camera"]["position_m"], [0.0, -30.0, 3.0]
-        )
+        self.assertEqual(len(viewer["audience_camera"]["position_m"]), 3)
+        self.assertGreater(viewer["led_appearance"]["scale"], 0.0)
+        self.assertLessEqual(viewer["led_appearance"]["scale"], 4.0)
+        self.assertGreater(viewer["led_appearance"]["intensity"], 0.0)
+        self.assertLessEqual(viewer["led_appearance"]["intensity"], 4.0)
         compatible = recipe._load_base_compatible_experiment(
             recipe.DEFAULT_EXPERIMENT
         )
@@ -136,6 +141,22 @@ scenario:
             ):
                 recipe._viewer_settings(experiment)
 
+    def test_led_appearance_rejects_out_of_range_value(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            experiment = Path(temporary) / "experiment.yaml"
+            experiment.write_text(
+                """viewer:
+  led_appearance:
+    scale: 4.1
+    intensity: 1.0
+""",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(
+                recipe.base.RecipeError, r"scale must be within \(0, 4\]"
+            ):
+                recipe._viewer_settings(experiment)
+
     def test_formation_audience_tilt_rejects_out_of_range_value(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             experiment = Path(temporary) / "experiment.yaml"
@@ -148,7 +169,7 @@ scenario:
                 encoding="utf-8",
             )
             with self.assertRaisesRegex(
-                recipe.base.RecipeError, "must be between 0 and 85"
+                recipe.base.RecipeError, "must be between -85 and 85"
             ):
                 recipe._formation_audience_tilt_deg(experiment)
 

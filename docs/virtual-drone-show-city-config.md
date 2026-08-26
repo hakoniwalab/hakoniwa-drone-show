@@ -72,6 +72,8 @@ ENU各軸のaxis-aligned bounding boxは、回転によってこの値より小�
 | 項目 | 型・制約 | 説明 |
 |---|---|---|
 | `viewer.initial_mode` | `free`または`audience` | ブラウザ起動時の視点です。`free`は従来のOrbitカメラ、`audience`は下記の観客視点です。ブラウザ上でいつでも切り替えられます。 |
+| `viewer.led_appearance.scale` | 0より大きく4以下 | LEDスプライト全体の表示サイズ倍率です。機体間隔やFormation寸法は変わりません。既定値は`1.45`です。 |
+| `viewer.led_appearance.intensity` | 0より大きく4以下 | Show Planで解決された機体別brightnessへ掛ける、画面表示全体の発光強度倍率です。既定値は`1.25`です。 |
 | `viewer.audience_camera.position_m` | 3要素の数値配列 | 観客カメラの初期位置をローカルENU座標`[East, North, Up]`（m）で指定します。 |
 | `viewer.audience_camera.yaw_deg` | 数値 | 水平向きです。0度はEast、正方向はNorth側です。 |
 | `viewer.audience_camera.pitch_deg` | -85〜85 | 仰角です。0度は水平、正方向は上です。 |
@@ -82,12 +84,15 @@ ENU各軸のaxis-aligned bounding boxは、回転によってこの値より小�
 マウスホイールでFOVを調整します。調整内容はブラウザ内だけに保持され、YAMLは
 自動更新されません。確定した値はYAMLへ反映して`configure`を再実行してください。
 
+`viewer.led_appearance`はThree.js上の見え方だけを調整します。Show PlanのLED
+`brightness`（0〜1）は機体・フレーム別の演出値であり、こちらの設定では変更しません。
+
 ### `scenario`
 
 | 項目 | 型・制約 | 説明 |
 |---|---|---|
 | `scenario.formation.scale_m` | 0より大きい数値 | 全Formationの公称最大寸法（m）です。顔の大きさを直接調整する項目です。詳細は「Formationの大きさ」を参照してください。 |
-| `scenario.formation.audience_tilt_deg` | 0〜85の数値 | Formation平面を水平面から観客側へ起こす角度（度）です。0度は上空から見やすい水平、90度に近いほど地上の観客へ正対します。既定の60度は観客視点向けです。`configure --formation-tilt-deg`で一時上書きできます。 |
+| `scenario.formation.audience_tilt_deg` | -85〜85の数値 | Formation平面を水平面から起こす角度（度）です。0度は上空から見やすい水平、絶対値が90度に近いほど地上の観客へ正対し、符号で傾斜方向が反転します。現在は反対方向を確認できるよう`-60`度に設定しています。`configure --formation-tilt-deg`で一時上書きできます。 |
 | `scenario.altitude_m` | 0.5以上の数値 | City飛行計画が要求する最低クリアランス（m）の既定値です。最終高度はCity colliderと`configure`時の`--altitude-mode`、`--above-city-clearance-m`等から解決され、生成markerとShow IRへ記録されます。 |
 | `scenario.duration_sec` | 0より大きい数値 | 各顔Formationへの移動に割り当てる時間（秒）です。Show Planの各stepの`transition_sec`になります。 |
 | `scenario.hold_sec` | 0以上の数値 | 各顔Formationを到達後に維持する時間（秒）です。Show Planの各stepの`hold_sec`になります。 |
@@ -96,8 +101,8 @@ ENU各軸のaxis-aligned bounding boxは、回転によってこの値より小�
 | `scenario.land` | 真偽値 | `true`ならShow終了後に着陸します。現在のCityデモは`false`で、明示的に`stop`するまで最後のFormationを保持します。 |
 
 `audience_tilt_deg`は人が理解しやすい「水平面から起こす角度」です。Show Planの
-`tilt_deg`は鉛直軸からの角度なので、configure時に`90 - audience_tilt_deg`へ変換します。
-例えばYAMLの60度はShow Planでは30度になります。
+`tilt_deg`は鉛直軸からの角度なので、configure時に符号を保った補角へ変換します。
+例えばYAMLの60度はShow Planの30度、YAMLの-60度はShow Planの-30度になります。
 
 汎用Business Packが内部で要求する`type`、`word`、`letter_width_m`、
 `letter_height_m`、`letter_gap_m`、`speed_m_s`はShow operatorが互換値を補います。これらは

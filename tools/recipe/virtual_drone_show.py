@@ -130,10 +130,10 @@ def _formation_audience_tilt_deg(
         not isinstance(value, (int, float))
         or isinstance(value, bool)
         or not math.isfinite(float(value))
-        or not 0.0 <= float(value) <= 85.0
+        or not -85.0 <= float(value) <= 85.0
     ):
         raise base.RecipeError(
-            "scenario.formation.audience_tilt_deg must be between 0 and 85"
+            "scenario.formation.audience_tilt_deg must be between -85 and 85"
         )
     return float(value)
 
@@ -159,19 +159,46 @@ def _viewer_settings(experiment_path: Path) -> dict:
         return {"initial_mode": "free"}
     if not isinstance(viewer, dict):
         raise base.RecipeError("viewer must be a mapping")
-    unknown = sorted(set(viewer) - {"initial_mode", "audience_camera"})
+    unknown = sorted(
+        set(viewer) - {"initial_mode", "audience_camera", "led_appearance"}
+    )
     if unknown:
         raise base.RecipeError("viewer has unknown fields: " + ", ".join(unknown))
     initial_mode = viewer.get("initial_mode", "free")
     if initial_mode not in {"free", "audience"}:
         raise base.RecipeError("viewer.initial_mode must be free or audience")
+    settings = {"initial_mode": initial_mode}
+    led_appearance = viewer.get("led_appearance")
+    if led_appearance is not None:
+        if not isinstance(led_appearance, dict):
+            raise base.RecipeError("viewer.led_appearance must be a mapping")
+        unknown_led = sorted(set(led_appearance) - {"scale", "intensity"})
+        if unknown_led:
+            raise base.RecipeError(
+                "viewer.led_appearance has unknown fields: "
+                + ", ".join(unknown_led)
+            )
+        resolved_led = {}
+        for key, default in (("scale", 1.45), ("intensity", 1.25)):
+            value = led_appearance.get(key, default)
+            if (
+                not isinstance(value, (int, float))
+                or isinstance(value, bool)
+                or not math.isfinite(float(value))
+                or not 0.0 < float(value) <= 4.0
+            ):
+                raise base.RecipeError(
+                    f"viewer.led_appearance.{key} must be within (0, 4]"
+                )
+            resolved_led[key] = float(value)
+        settings["led_appearance"] = resolved_led
     camera = viewer.get("audience_camera")
     if initial_mode == "audience" and not isinstance(camera, dict):
         raise base.RecipeError(
             "viewer.audience_camera is required when initial_mode is audience"
         )
     if camera is None:
-        return {"initial_mode": initial_mode}
+        return settings
     unknown_camera = sorted(
         set(camera) - {"position_m", "yaw_deg", "pitch_deg", "fov_deg"}
     )
@@ -214,13 +241,11 @@ def _viewer_settings(experiment_path: Path) -> dict:
         raise base.RecipeError(
             "viewer.audience_camera.fov_deg must be between 25 and 90"
         )
-    return {
-        "initial_mode": initial_mode,
-        "audience_camera": {
-            "position_m": [float(value) for value in position],
-            **resolved,
-        },
+    settings["audience_camera"] = {
+        "position_m": [float(value) for value in position],
+        **resolved,
     }
+    return settings
 
 
 def _load_base_compatible_experiment(path: Path):

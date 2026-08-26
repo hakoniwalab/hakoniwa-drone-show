@@ -108,6 +108,15 @@ def validate_show_ir_speed_limit(
     return required
 
 
+def _show_plan_tilt_from_audience(audience_tilt_deg: float) -> float:
+    """Convert signed degrees up from horizontal to signed Show Plan tilt."""
+
+    if not math.isfinite(audience_tilt_deg) or not -85.0 <= audience_tilt_deg <= 85.0:
+        raise ShowRuntimeError("formation audience tilt must be within [-85, 85]")
+    complement = 90.0 - abs(audience_tilt_deg)
+    return -complement if audience_tilt_deg < 0.0 else complement
+
+
 def _materialize_show_ir(*, recipe_config: Path, marker: dict[str, Any]) -> Path:
     """Compile the configured City fleet and Show-owned SVGs into runtime IR."""
 
@@ -163,9 +172,10 @@ def _materialize_show_ir(*, recipe_config: Path, marker: dict[str, Any]) -> Path
     )
     # The legacy city-show angle is measured up from the horizontal plane,
     # whereas Show Plan tilt_deg is measured away from the vertical Up axis.
-    # Convert the complementary angles so the generated IR preserves the
-    # established audience-facing formation orientation.
-    tilt_deg = 90.0 - legacy_audience_tilt_deg
+    # Preserve the side encoded by the sign while converting complementary
+    # angles: +60 -> +30 and -60 -> -30. Zero keeps the established +90
+    # horizontal orientation.
+    tilt_deg = _show_plan_tilt_from_audience(legacy_audience_tilt_deg)
     # Formation points are centered. Lift the center so their lowest Up value
     # remains at or above the route-safe flight altitude.
     minimum_normalized_up = min(
@@ -505,6 +515,22 @@ def materialize_browser(
     initial_mode = viewer_settings.get("initial_mode", "free")
     viewer_config["three"]["initialCameraMode"] = initial_mode
     audience = viewer_settings.get("audience_camera")
+    led_appearance = viewer_settings.get(
+        "led_appearance", {"scale": 1.45, "intensity": 1.25}
+    )
+    if (
+        not isinstance(led_appearance, dict)
+        or any(
+            not isinstance(led_appearance.get(key), (int, float))
+            or isinstance(led_appearance.get(key), bool)
+            or not math.isfinite(float(led_appearance[key]))
+            or not 0.0 < float(led_appearance[key]) <= 4.0
+            for key in ("scale", "intensity")
+        )
+    ):
+        raise ShowRuntimeError(
+            "drone_show.viewer.led_appearance scale/intensity must be within (0, 4]"
+        )
     if audience is not None:
         viewer_config["three"]["audienceCamera"] = {
             "positionM": audience["position_m"],
@@ -528,8 +554,8 @@ def materialize_browser(
         "origin": city["origin"],
         "expected_drone_count": int(marker["drone_count"]),
         "led_appearance": {
-            "scale": 1.45,
-            "intensity": 1.25,
+            "scale": float(led_appearance["scale"]),
+            "intensity": float(led_appearance["intensity"]),
         },
         "camera": {
             "initial_mode": initial_mode,

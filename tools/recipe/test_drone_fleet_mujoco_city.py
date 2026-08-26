@@ -271,13 +271,23 @@ def generate_xml(scene, drone, count):
 
     def test_formation_audience_tilt_accepts_show_facing_angle_range(self) -> None:
         with self.assertRaisesRegex(
-            recipe.FleetMujocoError, r"formation_tilt_deg must be in \[0, 85\]"
+            recipe.FleetMujocoError, r"formation_tilt_deg must be in \[-85, 85\]"
         ):
             recipe.materialize_fleet_config(
                 drone_root=Path("."),
                 recipe_config=Path("."),
                 model_receipt={},
                 formation_tilt_deg=86.0,
+            )
+
+        with self.assertRaisesRegex(
+            recipe.FleetMujocoError, r"formation_tilt_deg must be in \[-85, 85\]"
+        ):
+            recipe.materialize_fleet_config(
+                drone_root=Path("."),
+                recipe_config=Path("."),
+                model_receipt={},
+                formation_tilt_deg=-86.0,
             )
 
     def test_partition_ids_assign_remainder_to_final_processes(self) -> None:
