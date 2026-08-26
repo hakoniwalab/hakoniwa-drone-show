@@ -54,10 +54,14 @@ export function validateMessage(message) {
     }
     const allowed = new Set([
       'schema_version', 'protocol', 'kind', 'state', 'run_id', 'show_sha256',
-      'sequence', 'simulation_time_usec', 'error',
+      'sequence', 'simulation_time_usec', 'show_frame_index', 'error',
     ]);
     if (Object.keys(message).some((key) => !allowed.has(key))) {
       throw new Error('status contains an unknown field');
+    }
+    if (Object.hasOwn(message, 'show_frame_index')
+      && (!Number.isSafeInteger(message.show_frame_index) || message.show_frame_index < 0)) {
+      throw new Error('invalid show_frame_index');
     }
     if (message.state === 'failed') {
       if (typeof message.error !== 'string' || message.error.length < 1 || message.error.length > 256) {

@@ -131,20 +131,27 @@ def _materialize_show_ir(*, recipe_config: Path, marker: dict[str, Any]) -> Path
     }
     timeline = []
     led_overrides = (
-        None,
         {
-            "roles": [
-                {
-                    "led_role": "accent",
-                    "state": {
-                        "effect": "steady",
-                        "rgb": [80, 160, 255],
-                        "brightness": 1.0,
-                    },
-                }
-            ]
+            "default": {
+                "effect": "steady",
+                "rgb": [255, 64, 96],
+                "brightness": 1.0,
+            }
         },
-        None,
+        {
+            "default": {
+                "effect": "steady",
+                "rgb": [64, 255, 128],
+                "brightness": 1.0,
+            }
+        },
+        {
+            "default": {
+                "effect": "steady",
+                "rgb": [255, 220, 48],
+                "brightness": 1.0,
+            }
+        },
     )
     for index, (reference, timing, led) in enumerate(
         zip(formation_references, legacy_timeline, led_overrides), start=1
@@ -400,12 +407,16 @@ def materialize_browser(
     show_root: Path,
     web_root: Path,
     marker_path: Path,
+    show_ir_path: Path,
 ) -> Path:
     """Install the Show-owned page beside the Recipe-local Map Viewer."""
 
     show_root = show_root.resolve()
     web_root = web_root.resolve()
     marker = _read_json(marker_path.resolve())
+    show_ir_path = show_ir_path.resolve()
+    if not show_ir_path.is_file():
+        raise ShowRuntimeError(f"Show IR does not exist: {show_ir_path}")
     city = marker.get("city_world")
     if not isinstance(city, dict) or not isinstance(city.get("origin"), dict):
         raise ShowRuntimeError("MuJoCo City marker has no city origin")
@@ -436,6 +447,7 @@ def materialize_browser(
 
     destination = web_root / "drone-show"
     shutil.copytree(show_root / "web", destination, dirs_exist_ok=True)
+    shutil.copy2(show_ir_path, destination / "show-ir.json")
     runtime_config = {
         "schema_version": 1,
         "threejs_root": "/thirdparty/hakoniwa-threejs-drone",
@@ -443,6 +455,10 @@ def materialize_browser(
         "websocket_url": "ws://127.0.0.1:8765",
         "origin": city["origin"],
         "expected_drone_count": int(marker["drone_count"]),
+        "show_ir": {
+            "url": "./show-ir.json",
+            "sha256": _sha256(show_ir_path),
+        },
         "control": {
             "robot_name": protocol.ROBOT_NAME,
             "command_pdu_name": protocol.COMMAND_PDU_NAME,

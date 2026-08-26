@@ -143,6 +143,9 @@ class ShowExperienceRunnerTest(unittest.TestCase):
         self.assertEqual(initial_hold, 0.0)
         self.assertEqual([motion.duration_sec for motion in motions], [8.0, 8.0])
         self.assertEqual([motion.hold_sec for motion in motions], [6.0, 6.0])
+        self.assertEqual(
+            [motion.target_frame_index for motion in motions], [1, 3]
+        )
 
     def test_show_ir_enu_is_converted_once_for_drone_goto(self) -> None:
         self.assertEqual(enu_to_drone_ros([12.0, 34.0, 56.0]), (34.0, -12.0, 56.0))

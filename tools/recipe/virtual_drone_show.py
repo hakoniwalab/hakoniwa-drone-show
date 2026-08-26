@@ -98,6 +98,10 @@ def _write_show_launcher(
         show_root=SHOW_ROOT,
         web_root=paths.recipe_root / "web" / "map-viewer",
         marker_path=paths.recipe_config / "mujoco-city-fleet.json",
+        show_ir_path=paths.recipe_config
+        / "scenario"
+        / "show-ir"
+        / "show-ir.json",
     )
     return show_runtime.patch_launcher(
         launcher,

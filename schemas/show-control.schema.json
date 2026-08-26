@@ -51,6 +51,7 @@
             "show_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
             "sequence": {"type": "integer", "minimum": 1},
             "simulation_time_usec": {"type": "integer", "minimum": 0},
+            "show_frame_index": {"type": "integer", "minimum": 0},
             "error": {"type": "string", "minLength": 1, "maxLength": 256}
           },
           "allOf": [

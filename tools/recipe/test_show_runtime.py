@@ -119,6 +119,54 @@ class ShowRuntimeTest(unittest.TestCase):
             self.assertEqual(assets["web-bridge-fleets"]["args"][1], str((root / "bridge").resolve()))
             self.assertEqual(assets["visual-state-publisher"]["args"], ["vsp.json"])
 
+    def test_browser_receives_the_exact_runtime_show_ir(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            show_root = root / "show"
+            write_json(show_root / "web" / "placeholder.json", {"ok": True})
+            web_root = root / "viewer"
+            embedded = web_root / "thirdparty" / "hakoniwa-threejs-drone"
+            write_json(
+                embedded / "config" / "viewer-config-fleets.json",
+                {
+                    "pdu": {"pduDefPath": "./visual.json"},
+                },
+            )
+            write_json(
+                embedded / "config" / "visual.json",
+                {"paths": [], "robots": []},
+            )
+            marker = root / "marker.json"
+            write_json(
+                marker,
+                {
+                    "drone_count": 2,
+                    "city_world": {
+                        "origin": {
+                            "latitude": 35.0,
+                            "longitude": 138.0,
+                            "altitude_offset_m": 0.0,
+                        }
+                    },
+                },
+            )
+            show_ir = root / "show-ir.json"
+            show_ir.write_text('{"schema_version":"0.1"}\n', encoding="utf-8")
+
+            destination = show_runtime.materialize_browser(
+                show_root=show_root,
+                web_root=web_root,
+                marker_path=marker,
+                show_ir_path=show_ir,
+            )
+
+            self.assertEqual((destination / "show-ir.json").read_bytes(), show_ir.read_bytes())
+            runtime = json.loads((destination / "runtime-config.json").read_text())
+            self.assertEqual(runtime["show_ir"]["url"], "./show-ir.json")
+            self.assertEqual(
+                runtime["show_ir"]["sha256"], show_runtime._sha256(show_ir)
+            )
+
     def test_configured_city_fleet_is_compiled_into_show_ir(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -172,6 +220,13 @@ class ShowRuntimeTest(unittest.TestCase):
             self.assertEqual(
                 show_ir["timeline"][0]["states"][0]["position_m"],
                 [2.0, 1.0, 3.0],
+            )
+            self.assertEqual(
+                [
+                    show_ir["timeline"][index]["states"][0]["led"]["rgb"]
+                    for index in (1, 3, 5)
+                ],
+                [[255, 64, 96], [64, 255, 128], [255, 220, 48]],
             )
             plan = json.loads(
                 (show_ir_path.parent / "show-plan.json").read_text(encoding="utf-8")

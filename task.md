@@ -286,7 +286,7 @@ Formation authoring、Transition planning、256機対応などの新機能はTas
 - [x] `--show-status-heartbeat-hz`でheartbeat周期を変更できるようにする
 - [x] 起動時に新しい`run_id`を書き、前回実行のcommand/statusを無効化する
 - [x] WebBridgeでShow Statusの1チャンネルだけをViewerへ転送する
-- [ ] Viewerが`show_sha256`をresolved show planと照合し、不一致を拒否する
+- [x] Viewerが`show_sha256`をresolved Show IRと照合し、不一致を拒否する
 - [ ] Status PDUを無効化した場合は、従来のShow Runnerと同じ挙動を維持する
 
 ### Acceptance Test
@@ -302,15 +302,15 @@ Formation authoring、Transition planning、256機対応などの新機能はTas
 
 ### 要件
 
-- [ ] Viewerがresolved show planをHTTPで読み込む
-- [ ] Show Statusの`phase_index`から現在のtimeline stepを選択する
+- [x] Viewerがresolved Show IRをHTTPで読み込む
+- [x] Show Statusの`show_frame_index`から現在のresolved frameを選択する
 - [ ] heartbeat間は`phase_elapsed_sec`とブラウザのmonotonic clockで表示時刻を補間する
 - [ ] 次のStatus受信時にシミュレーション時刻との差を穏やかに補正する
 - [ ] 計画に基づいて常灯、点滅、フェードを再生する
 - [ ] 全機共通、グループ単位、formation point単位の色と明るさを描画する
-- [ ] Three.jsの既存LED Spriteへ色と明るさを反映する
+- [x] Three.jsの既存LED Spriteへ色と明るさを反映する
 - [ ] PointLightを機体数分追加せず、既存の軽量Sprite方式を維持する
-- [ ] 現在のViewer内固定青色・固定周期処理を互換fallbackへ限定する
+- [x] 現在のViewer内固定青色・固定周期処理を互換fallbackへ限定する
 - [ ] Drone位置と現在formationの一致度を計算し、Statusとの明らかな不一致を警告する
 - [ ] Status PDUがない場合だけ、位置一致度と開始時刻による推定をfallbackとして利用する
 - [ ] position推定だけでhold経過時間を決定しない
@@ -321,7 +321,7 @@ Formation authoring、Transition planning、256機対応などの新機能はTas
 
 - [ ] 同一編隊の一部を赤、緑、黄で同時表示できる
 - [ ] LED offの機体が消灯して見える
-- [ ] 3つ以上のformationを異なる色で順番に再生できる
+- [x] 3つ以上のformationを異なる色で順番に再生できる
 - [ ] 低速点滅から常灯、フェードへの切り替えを確認できる
 - [ ] 3回実行してstep開始タイミングが許容誤差内で一致する
 - [ ] ブラウザの再描画負荷が変化してもLED周期がずれない

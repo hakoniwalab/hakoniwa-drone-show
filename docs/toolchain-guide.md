@@ -184,8 +184,10 @@ DroneGoToの直線移動へ変換し、機体ごとの距離と区間時間か�
 `--show-ir-max-speed-m-s`を指定した場合だけ速度を制限し、到達時間を安全側へ延長します。離陸と
 必要なservice初期化は実績のあるDrone PRO preludeを利用し、その後にIR timelineを実行します。
 
-LED値はIRへ解決済みですが、v0.1 runtimeはまだ表示へ反映しません。また、City runtimeは
-設定済みCity World原点に対するlocal ENUだけを受け付け、`placement`付きIRは明示的に拒否します。
+runtime用Show IRはShow専用Web rootへ同一byte列で配置され、SHA-256を
+`runtime-config.json`へ記録します。ViewerはShow Statusのhashと照合したうえで、
+`show_frame_index`に対応するRGBとbrightnessをThree.js LED Spriteへ反映します。
+City runtimeは設定済みCity World原点に対するlocal ENUだけを受け付け、`placement`付きIRは明示的に拒否します。
 `--show-ir`を省略した直接起動では、従来の`show.json`経路がそのまま動作します。
 
 ## 7. 回帰テスト

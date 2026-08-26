@@ -71,13 +71,16 @@ Task 1ではUI復元に必要な最小状態だけを通知します。
   "run_id": "32文字の小文字16進数",
   "show_sha256": "64文字の小文字16進数",
   "sequence": 3,
-  "simulation_time_usec": 1234560
+  "simulation_time_usec": 1234560,
+  "show_frame_index": 1
 }
 ```
 
 `state`は`initializing`、`waiting`、`running`、`completed`、`failed`のいずれかです。
 `failed`だけは1..256文字の`error`を持ちます。状態変化時は即時、同じ状態の間は
-既定1 Hzで更新します。将来のphase情報はTask 4でこのStatusへ追加します。
+既定1 Hzで更新します。Show IR実行時の`show_frame_index`は、Viewerが表示すべきresolved
+frameを示します。移動中は出発frameを維持し、目的frameへの到着時に更新されます。
+旧`show.json`経路ではこの任意fieldを省略します。
 
 ブラウザは同じ`run_id`のStatusだけを`sequence`で順序判定します。Runner再起動により
 `run_id`が変わった場合はsequence基準をリセットし、新しい実行のsequence=1から受理します。

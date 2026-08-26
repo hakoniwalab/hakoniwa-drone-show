@@ -26,8 +26,20 @@ class ShowControlProtocolTest(unittest.TestCase):
             show_sha256=SHOW_HASH,
             sequence=3,
             simulation_time_usec=20000,
+            show_frame_index=3,
         )
         self.assertEqual(protocol.decode_frame(protocol.encode_frame(message)), message)
+
+    def test_status_rejects_invalid_show_frame_index(self) -> None:
+        with self.assertRaisesRegex(protocol.ProtocolError, "show_frame_index"):
+            protocol.show_status(
+                state="running",
+                run_id=RUN_ID,
+                show_sha256=SHOW_HASH,
+                sequence=1,
+                simulation_time_usec=0,
+                show_frame_index=-1,
+            )
 
     def test_never_written_shm_slot_is_empty(self) -> None:
         self.assertIsNone(protocol.decode_frame(bytes(protocol.FRAME_SIZE)))

@@ -10,6 +10,7 @@ const status = {
   show_sha256: 'a'.repeat(64),
   sequence: 2,
   simulation_time_usec: 20000,
+  show_frame_index: 0,
 };
 const command = startCommand(status, 1);
 const encoded = encodeFrame(command);
@@ -17,4 +18,8 @@ assert.equal(encoded.byteLength, FRAME_SIZE);
 assert.deepEqual(decodeFrame(encoded), command);
 assert.equal(decodeFrame(new ArrayBuffer(FRAME_SIZE)), null);
 assert.throws(() => decodeFrame(new ArrayBuffer(FRAME_SIZE - 1)), /1024/);
+assert.throws(
+  () => encodeFrame({ ...status, show_frame_index: -1 }),
+  /show_frame_index/,
+);
 console.log('show-pdu-codec: ok');

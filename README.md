@@ -125,6 +125,11 @@ Task 1対応Recipeでは、`start`しても自動的に離陸しません。`ope
 既存の汎用Map Viewer画面とICRA実行経路は変更せず、専用画面はRecipe生成物の
 `/drone-show/index.html`として追加されます。
 
+専用画面はruntime用Show IRをHTTPで読み、Show Statusの`show_frame_index`に同期して
+機体ごとのRGBとbrightnessを表示します。現在のCityデモは3つのFormationを赤、緑、黄で
+順番に表示します。LED指定を行わない既存Viewerでは、従来の水色breathing表示がそのまま
+fallbackとして使われます。
+
 ## Show toolchain v0.1
 
 Formation JSONはSVG等から生成する再利用可能な正規化点群、Show IRは機体割当・時刻・

@@ -64,9 +64,9 @@ Hakoniwa/ROS座標への変換は実行Adapterが一度だけ行い、Show IR自
 - LEDの`rgb`と`brightness`は次のframeまで保持する
 - 同じ位置を後続frameへ記述することでhold時間を表現する
 
-RGBは0..255の整数3要素、brightnessは0..1です。v0.1のShow RunnerはLED値を無視して
-現在の表示を維持できますが、resolverは将来のViewer実装が同じIRを利用できるよう
-全frameへ明示的なLED状態を出力します。
+RGBは0..255の整数3要素、brightnessは0..1です。resolverは全frameへ明示的なLED状態を
+出力します。Drone Show ViewerはRunnerがStatusで通知する`show_frame_index`を使い、
+該当frameの機体別LED状態を既存の軽量Spriteへ反映します。
 
 ## Drone ID
 
@@ -107,5 +107,6 @@ IR modeでは旧`show.json`を読みません。Drone PROの既存CLI parserと�
 Launcherには旧引数も残りますが、機体割当、位置、時間、LEDの実行正本はShow IRです。
 
 現在のCity adapterは`placement`を扱わず、設定済みCity World原点に対するlocal ENUを
-要求します。LEDは読み込み・検証対象ですが、v0.1のViewer表示にはまだ反映しません。
+要求します。LEDは目的frameへの到着時にViewerへ反映し、移動中は直前frameの状態を
+保持します。
 Drone PROの既存Runnerは変更しておらず、`--show-ir`未指定時は従来の`show.json`を実行します。

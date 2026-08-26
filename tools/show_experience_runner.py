@@ -36,6 +36,7 @@ from tools.show_ir import ShowIrValidationError, validate_show_ir
 class ShowIrMotion:
     source_time_sec: float
     target_time_sec: float
+    target_frame_index: int
     target_states: tuple[dict[str, Any], ...]
     hold_sec: float
 
@@ -143,7 +144,7 @@ def show_ir_schedule(
     initial_hold_sec = 0.0
     motions: list[ShowIrMotion] = []
     previous = frames[0]
-    for frame in frames[1:]:
+    for frame_index, frame in enumerate(frames[1:], start=1):
         elapsed = float(frame["time_sec"]) - float(previous["time_sec"])
         if _same_positions(previous["states"], frame["states"]):
             if motions:
@@ -151,6 +152,7 @@ def show_ir_schedule(
                 motions[-1] = ShowIrMotion(
                     source_time_sec=last.source_time_sec,
                     target_time_sec=last.target_time_sec,
+                    target_frame_index=last.target_frame_index,
                     target_states=last.target_states,
                     hold_sec=last.hold_sec + elapsed,
                 )
@@ -161,6 +163,7 @@ def show_ir_schedule(
                 ShowIrMotion(
                     source_time_sec=float(previous["time_sec"]),
                     target_time_sec=float(frame["time_sec"]),
+                    target_frame_index=frame_index,
                     target_states=tuple(frame["states"]),
                     hold_sec=0.0,
                 )
@@ -226,6 +229,7 @@ def make_state_machine_class(base_module: ModuleType, hakopy: Any):
                 1_000_000 / float(args.show_status_heartbeat_hz)
             )
             self.execution_released = not self.wait_for_show_start
+            self.show_frame_index = 0 if self.show_ir is not None else None
 
         def _initialize_show_ir_runtime(self, args: argparse.Namespace) -> None:
             """Initialize Drone PRO execution state without reading legacy show.json."""
@@ -412,6 +416,7 @@ def make_state_machine_class(base_module: ModuleType, hakopy: Any):
                         f"Show IR goto failed at {motion.target_time_sec:g} sec"
                     )
                 self.estimated_positions = dict(self._current_assignments)
+                self.show_frame_index = motion.target_frame_index
                 hold_sec = motion.hold_sec
                 if final_motion and not self.args.land:
                     hold_sec += max(0.0, float(self.args.final_hold_extra_sec))
@@ -444,6 +449,7 @@ def make_state_machine_class(base_module: ModuleType, hakopy: Any):
                 show_sha256=self.show_sha256,
                 sequence=self.status_sequence,
                 simulation_time_usec=now,
+                show_frame_index=self.show_frame_index,
                 error=error,
             )
             # hakopy's native binding requires a mutable bytearray even though
