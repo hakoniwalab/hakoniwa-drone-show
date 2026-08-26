@@ -1,0 +1,40 @@
+{
+  "schema_version": "0.1",
+  "formation_id": "diamond-4",
+  "title": "Four-point diamond",
+  "coordinate_system": {
+    "frame": "FORMATION_LOCAL",
+    "axes": ["right", "up", "depth"],
+    "position_unit": "normalized"
+  },
+  "points": [
+    {
+      "point_id": "outline-001",
+      "group_id": "outline",
+      "led_role": "accent-red",
+      "position": [0.0, 0.5, 0.0],
+      "default_led": { "rgb": [255, 0, 0], "brightness": 1.0 }
+    },
+    {
+      "point_id": "outline-002",
+      "group_id": "outline",
+      "led_role": "accent-yellow",
+      "position": [0.5, 0.0, 0.0],
+      "default_led": { "rgb": [255, 255, 0], "brightness": 1.0 }
+    },
+    {
+      "point_id": "outline-003",
+      "group_id": "outline",
+      "led_role": "accent-green",
+      "position": [0.0, -0.5, 0.0],
+      "default_led": { "rgb": [0, 255, 0], "brightness": 1.0 }
+    },
+    {
+      "point_id": "outline-004",
+      "group_id": "outline",
+      "led_role": "accent-blue",
+      "position": [-0.5, 0.0, 0.0],
+      "default_led": { "rgb": [0, 128, 255], "brightness": 1.0 }
+    }
+  ]
+}

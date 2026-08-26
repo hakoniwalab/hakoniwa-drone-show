@@ -163,6 +163,19 @@ Formation authoring、Transition planning、256機対応などの新機能はTas
 - [ ] Chromeで正常に動作する
 - [ ] Safariで正常に動作する
 
+## Toolchain Foundation: Hakoniwa Show IR v0.1
+
+- [x] 実行・検証用resolved表現とSVG／authoring `show.json`の責務を分離する
+- [x] 時刻、Drone ID、ENU位置、RGB、brightness、City placementをSchema化する
+- [x] position=`linear`、LED=`hold`の補間規則を定義する
+- [x] 時刻順かつ全機体割当済みの最小Show IRサンプルを追加する
+- [x] 箱庭runtimeに依存しないvalidatorと意味制約テストを追加する
+- [x] Formation JSONの責務、正規化座標、point/group ID、LED role、任意の既定LEDをSchema化する
+- [x] Formation JSONの最小サンプルとruntime非依存validatorを追加する
+- [ ] SVGから指定機体数のFormation JSONを生成する
+- [ ] Formation、割当、移動時間、hold時間からShow IRをcompileする
+- [ ] 現在の3 FormationショーをShow IRから再現する
+
 ## Task 2: Formation制作とオフライン移動計画
 
 ### 現状と課題

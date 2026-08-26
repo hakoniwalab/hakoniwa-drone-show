@@ -97,4 +97,29 @@ Task 1対応Recipeでは、`start`しても自動的に離陸しません。`ope
 既存の汎用Map Viewer画面とICRA実行経路は変更せず、専用画面はRecipe生成物の
 `/drone-show/index.html`として追加されます。
 
+## Show IR v0.1ツールチェーン
+
+Formation JSONはSVG等から生成する再利用可能な正規化点群、Show IRは機体割当・時刻・
+位置・LED状態が確定済みの実行・検証フォーマットです。
+
+- [`docs/formation-v0.1.md`](docs/formation-v0.1.md)
+- [`schemas/formation-v0.1.schema.json`](schemas/formation-v0.1.schema.json)
+- [`examples/formations/diamond-4.json`](examples/formations/diamond-4.json)
+
+- [`docs/show-ir-v0.1.md`](docs/show-ir-v0.1.md)
+- [`schemas/show-ir-v0.1.schema.json`](schemas/show-ir-v0.1.schema.json)
+- [`examples/show-ir/minimal.json`](examples/show-ir/minimal.json)
+
+箱庭、Drone PRO、Viewerを起動せず、標準Pythonだけで検証できます。
+
+```bash
+python3 tools/formation.py validate examples/formations/diamond-4.json
+python3 tools/show_ir.py validate examples/show-ir/minimal.json
+python3 -m unittest tools.test_formation
+python3 -m unittest tools.test_show_ir
+```
+
+現在のShow RunnerはまだShow IRを入力にしません。次段階でSVGからFormation点群を生成し、
+authoring planと機体割当からShow IRをcompileした後に、既存ショーの再現へ接続します。
+
 現在の設計・実装タスクは[`task.md`](task.md)を参照してください。

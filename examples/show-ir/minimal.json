@@ -1,0 +1,68 @@
+{
+  "schema_version": "0.1",
+  "show_id": "minimal-two-drone-show",
+  "title": "Minimal two-drone Show IR",
+  "time_unit": "second",
+  "coordinate_system": {
+    "frame": "ENU",
+    "position_unit": "meter"
+  },
+  "placement": {
+    "latitude_deg": 34.97171,
+    "longitude_deg": 138.38884,
+    "altitude_offset_m": 0.0,
+    "heading_deg": 0.0
+  },
+  "interpolation": {
+    "position": "linear",
+    "led": "hold"
+  },
+  "drone_ids": ["Drone-1", "Drone-2"],
+  "timeline": [
+    {
+      "time_sec": 0.0,
+      "states": [
+        {
+          "drone_id": "Drone-1",
+          "position_m": [-1.0, 0.0, 0.0],
+          "led": { "rgb": [255, 255, 255], "brightness": 1.0 }
+        },
+        {
+          "drone_id": "Drone-2",
+          "position_m": [1.0, 0.0, 0.0],
+          "led": { "rgb": [255, 255, 255], "brightness": 1.0 }
+        }
+      ]
+    },
+    {
+      "time_sec": 5.0,
+      "states": [
+        {
+          "drone_id": "Drone-1",
+          "position_m": [-1.0, 0.0, 10.0],
+          "led": { "rgb": [255, 0, 0], "brightness": 1.0 }
+        },
+        {
+          "drone_id": "Drone-2",
+          "position_m": [1.0, 0.0, 10.0],
+          "led": { "rgb": [0, 255, 0], "brightness": 1.0 }
+        }
+      ]
+    },
+    {
+      "time_sec": 8.0,
+      "states": [
+        {
+          "drone_id": "Drone-1",
+          "position_m": [-1.0, 0.0, 10.0],
+          "led": { "rgb": [255, 0, 0], "brightness": 1.0 }
+        },
+        {
+          "drone_id": "Drone-2",
+          "position_m": [1.0, 0.0, 10.0],
+          "led": { "rgb": [0, 255, 0], "brightness": 1.0 }
+        }
+      ]
+    }
+  ]
+}

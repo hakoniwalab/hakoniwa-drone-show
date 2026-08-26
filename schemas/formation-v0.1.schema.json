@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hakoniwalab.github.io/hakoniwa-drone-show/schemas/formation-v0.1.schema.json",
+  "title": "Hakoniwa Formation v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "formation_id",
+    "coordinate_system",
+    "points"
+  ],
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "formation_id": { "$ref": "#/$defs/identifier" },
+    "title": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "coordinate_system": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["frame", "axes", "position_unit"],
+      "properties": {
+        "frame": { "const": "FORMATION_LOCAL" },
+        "axes": {
+          "type": "array",
+          "prefixItems": [
+            { "const": "right" },
+            { "const": "up" },
+            { "const": "depth" }
+          ],
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "position_unit": { "const": "normalized" }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "sha256"],
+      "properties": {
+        "kind": { "enum": ["svg", "generated", "imported"] },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "uri": { "type": "string", "minLength": 1, "maxLength": 512 }
+      }
+    },
+    "points": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/point" }
+    }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+    },
+    "position": {
+      "type": "array",
+      "prefixItems": [
+        { "type": "number" },
+        { "type": "number" },
+        { "type": "number" }
+      ],
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "led": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rgb", "brightness"],
+      "properties": {
+        "rgb": {
+          "type": "array",
+          "prefixItems": [
+            { "type": "integer", "minimum": 0, "maximum": 255 },
+            { "type": "integer", "minimum": 0, "maximum": 255 },
+            { "type": "integer", "minimum": 0, "maximum": 255 }
+          ],
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "brightness": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "point": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["point_id", "group_id", "led_role", "position"],
+      "properties": {
+        "point_id": { "$ref": "#/$defs/identifier" },
+        "group_id": { "$ref": "#/$defs/identifier" },
+        "led_role": { "$ref": "#/$defs/identifier" },
+        "position": { "$ref": "#/$defs/position" },
+        "default_led": { "$ref": "#/$defs/led" }
+      }
+    }
+  }
+}
