@@ -97,10 +97,11 @@ Task 1対応Recipeでは、`start`しても自動的に離陸しません。`ope
 既存の汎用Map Viewer画面とICRA実行経路は変更せず、専用画面はRecipe生成物の
 `/drone-show/index.html`として追加されます。
 
-## Show IR v0.1ツールチェーン
+## Show toolchain v0.1
 
 Formation JSONはSVG等から生成する再利用可能な正規化点群、Show IRは機体割当・時刻・
-位置・LED状態が確定済みの実行・検証フォーマットです。
+位置・LED状態が確定済みの実行・検証フォーマットです。Show Planは両者の間でFormation
+の順序、移動・待機時間、配置、LED演出を記述します。
 
 - [`docs/formation-v0.1.md`](docs/formation-v0.1.md)
 - [`schemas/formation-v0.1.schema.json`](schemas/formation-v0.1.schema.json)
@@ -110,9 +111,15 @@ Formation JSONはSVG等から生成する再利用可能な正規化点群、Sho
 - [`examples/formations/cat-ear-face-128.json`](examples/formations/cat-ear-face-128.json)
 - [`examples/formations/long-ear-face-128.json`](examples/formations/long-ear-face-128.json)
 
+- [`docs/show-plan-v0.1.md`](docs/show-plan-v0.1.md)
+- [`schemas/show-plan-v0.1.schema.json`](schemas/show-plan-v0.1.schema.json)
+- [`examples/show-plans/three-face-demo.json`](examples/show-plans/three-face-demo.json)
+- [`schemas/initial-fleet-state-v0.1.schema.json`](schemas/initial-fleet-state-v0.1.schema.json)
+
 - [`docs/show-ir-v0.1.md`](docs/show-ir-v0.1.md)
 - [`schemas/show-ir-v0.1.schema.json`](schemas/show-ir-v0.1.schema.json)
 - [`examples/show-ir/minimal.json`](examples/show-ir/minimal.json)
+- [`docs/toolchain-guide.md`](docs/toolchain-guide.md)
 
 箱庭、Drone PRO、Viewerを起動せず、標準Pythonだけで検証できます。
 
@@ -122,12 +129,19 @@ python3 tools/generate_demo_formations.py
 python3 tools/svg_to_formation.py assets/formations/round-ear-face.svg \
   --formation-id round-ear-face-128 --points 128 \
   --output /tmp/round-ear-face-128.json
+python3 tools/show_plan.py validate examples/show-plans/three-face-demo.json
+python3 tools/initial_fleet_state.py generate-grid \
+  --drone-count 128 --output /tmp/initial-fleet-state.json
+python3 tools/show_compiler.py \
+  --plan examples/show-plans/three-face-demo.json \
+  --initial-state /tmp/initial-fleet-state.json \
+  --output /tmp/three-face-show-ir.json
 python3 tools/show_ir.py validate examples/show-ir/minimal.json
 python3 -m unittest tools.test_formation
 python3 -m unittest tools.test_show_ir
 ```
 
-現在のShow RunnerはまだShow IRを入力にしません。次段階でauthoring planと機体割当から
-Show IRをcompileした後に、既存ショーの再現へ接続します。
+現在のShow RunnerはまだShow IRを入力にしません。SVGからShow IRまでのオフライン
+toolchainは完成しており、次段階で既存ショーの実行経路へ接続します。
 
 現在の設計・実装タスクは[`task.md`](task.md)を参照してください。

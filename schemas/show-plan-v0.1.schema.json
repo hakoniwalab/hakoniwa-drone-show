@@ -1,0 +1,193 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hakoniwalab.github.io/hakoniwa-drone-show/schemas/show-plan-v0.1.schema.json",
+  "title": "Hakoniwa Show Plan v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "show_id",
+    "time_unit",
+    "fleet",
+    "formations",
+    "defaults",
+    "timeline"
+  ],
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "show_id": { "$ref": "#/$defs/identifier" },
+    "title": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "time_unit": { "const": "second" },
+    "placement": { "$ref": "#/$defs/placement" },
+    "fleet": { "$ref": "#/$defs/fleet" },
+    "formations": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/formationReference" }
+    },
+    "defaults": { "$ref": "#/$defs/defaults" },
+    "timeline": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/step" }
+    }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "position": {
+      "type": "array",
+      "prefixItems": [
+        { "type": "number" },
+        { "type": "number" },
+        { "type": "number" }
+      ],
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "placement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["latitude_deg", "longitude_deg", "altitude_offset_m", "heading_deg"],
+      "properties": {
+        "latitude_deg": { "type": "number", "minimum": -90, "maximum": 90 },
+        "longitude_deg": { "type": "number", "minimum": -180, "maximum": 180 },
+        "altitude_offset_m": { "type": "number" },
+        "heading_deg": { "type": "number", "minimum": 0, "exclusiveMaximum": 360 }
+      }
+    },
+    "droneIdPattern": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["prefix", "start", "zero_padding"],
+      "properties": {
+        "prefix": { "type": "string", "maxLength": 48 },
+        "start": { "type": "integer", "minimum": 0 },
+        "zero_padding": { "type": "integer", "minimum": 0, "maximum": 12 }
+      }
+    },
+    "assignment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["strategy"],
+      "properties": {
+        "strategy": { "enum": ["index", "nearest-greedy"] }
+      }
+    },
+    "fleet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["drone_count", "drone_id_pattern", "assignment"],
+      "properties": {
+        "drone_count": { "type": "integer", "minimum": 1 },
+        "drone_id_pattern": { "$ref": "#/$defs/droneIdPattern" },
+        "assignment": { "$ref": "#/$defs/assignment" }
+      }
+    },
+    "formationReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["formation_id", "path", "sha256"],
+      "properties": {
+        "formation_id": { "$ref": "#/$defs/identifier" },
+        "path": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "transform": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scale_m", "translation_m", "yaw_deg", "tilt_deg"],
+      "properties": {
+        "scale_m": { "type": "number", "exclusiveMinimum": 0 },
+        "translation_m": { "$ref": "#/$defs/position" },
+        "yaw_deg": { "type": "number", "minimum": 0, "exclusiveMaximum": 360 },
+        "tilt_deg": { "type": "number", "minimum": -90, "maximum": 90 }
+      }
+    },
+    "ledState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["effect", "rgb", "brightness"],
+      "properties": {
+        "effect": { "const": "steady" },
+        "rgb": {
+          "type": "array",
+          "prefixItems": [
+            { "type": "integer", "minimum": 0, "maximum": 255 },
+            { "type": "integer", "minimum": 0, "maximum": 255 },
+            { "type": "integer", "minimum": 0, "maximum": 255 }
+          ],
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "brightness": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "ledRoleOverride": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["led_role", "state"],
+      "properties": {
+        "led_role": { "$ref": "#/$defs/identifier" },
+        "state": { "$ref": "#/$defs/ledState" }
+      }
+    },
+    "ledPlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "default": { "$ref": "#/$defs/ledState" },
+        "roles": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/ledRoleOverride" }
+        }
+      }
+    },
+    "defaultLedPlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["default"],
+      "properties": {
+        "default": { "$ref": "#/$defs/ledState" },
+        "roles": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/ledRoleOverride" }
+        }
+      }
+    },
+    "defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["transition_sec", "hold_sec", "transform", "led"],
+      "properties": {
+        "transition_sec": { "type": "number", "exclusiveMinimum": 0 },
+        "hold_sec": { "type": "number", "minimum": 0 },
+        "transform": { "$ref": "#/$defs/transform" },
+        "led": { "$ref": "#/$defs/defaultLedPlan" }
+      }
+    },
+    "step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["step_id", "formation_id"],
+      "properties": {
+        "step_id": { "$ref": "#/$defs/identifier" },
+        "formation_id": { "$ref": "#/$defs/identifier" },
+        "transition_sec": { "type": "number", "exclusiveMinimum": 0 },
+        "hold_sec": { "type": "number", "minimum": 0 },
+        "transform": { "$ref": "#/$defs/transform" },
+        "led": { "$ref": "#/$defs/ledPlan" }
+      }
+    }
+  }
+}

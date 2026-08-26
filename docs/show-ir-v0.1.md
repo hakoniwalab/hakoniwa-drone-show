@@ -26,6 +26,7 @@ Formationの順序、移動時間、hold時間などを指定するauthoring pla
 SVGからsample・正規化した再利用可能な点群の正本は
 [`Hakoniwa Formation JSON v0.1`](formation-v0.1.md)です。Show PlanはFormation JSONを
 参照し、compilerがその内容をShow IRのtimelineへ展開します。
+Show Planの正本は[`Hakoniwa Show Plan JSON v0.1`](show-plan-v0.1.md)です。
 
 Show IRにはSVG path、Formation名、割当アルゴリズム、生成理由を保存しません。
 resolverが全Drone ID、時刻、位置、LED状態を確定した後の成果物だけを格納します。
@@ -90,3 +91,7 @@ python3 tools/show_ir.py validate examples/show-ir/minimal.json
 
 validatorはJSON Schemaで表現する構造制約に加え、先頭時刻、時刻順、frame内のDrone ID
 重複、および全frameの機体集合一致を検証します。
+
+Show IRは手書きせず、[`tools/show_compiler.py`](../tools/show_compiler.py)でShow Plan、
+Formation、Initial Fleet Stateから生成します。通し手順は
+[ツールチェーン利用手順](toolchain-guide.md)を参照してください。

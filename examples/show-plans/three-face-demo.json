@@ -1,0 +1,77 @@
+{
+  "schema_version": "0.1",
+  "show_id": "three-face-demo-128",
+  "title": "Three procedural face formations",
+  "time_unit": "second",
+  "fleet": {
+    "drone_count": 128,
+    "drone_id_pattern": {
+      "prefix": "Drone-",
+      "start": 1,
+      "zero_padding": 0
+    },
+    "assignment": {
+      "strategy": "index"
+    }
+  },
+  "formations": [
+    {
+      "formation_id": "round-ear-face-128",
+      "path": "../formations/round-ear-face-128.json",
+      "sha256": "f17850384d07bd07bc544cb80095ededdc71e033fd2e328995f59417f92f6a99"
+    },
+    {
+      "formation_id": "cat-ear-face-128",
+      "path": "../formations/cat-ear-face-128.json",
+      "sha256": "4bfaf71f2b055d594bf5af990d561002640e267ecb4f8d7d16333f672aa0ef24"
+    },
+    {
+      "formation_id": "long-ear-face-128",
+      "path": "../formations/long-ear-face-128.json",
+      "sha256": "385800678fd09fa5fa0b22654e15cc111cb2d659a209438e4638c378b91ad3c0"
+    }
+  ],
+  "defaults": {
+    "transition_sec": 8.0,
+    "hold_sec": 6.0,
+    "transform": {
+      "scale_m": 40.0,
+      "translation_m": [0.0, 0.0, 30.0],
+      "yaw_deg": 0.0,
+      "tilt_deg": 15.0
+    },
+    "led": {
+      "default": {
+        "effect": "steady",
+        "rgb": [255, 255, 255],
+        "brightness": 1.0
+      }
+    }
+  },
+  "timeline": [
+    {
+      "step_id": "round-ear",
+      "formation_id": "round-ear-face-128"
+    },
+    {
+      "step_id": "cat-ear",
+      "formation_id": "cat-ear-face-128",
+      "led": {
+        "roles": [
+          {
+            "led_role": "accent",
+            "state": {
+              "effect": "steady",
+              "rgb": [80, 160, 255],
+              "brightness": 1.0
+            }
+          }
+        ]
+      }
+    },
+    {
+      "step_id": "long-ear",
+      "formation_id": "long-ear-face-128"
+    }
+  ]
+}
