@@ -207,7 +207,13 @@ def generate_xml(scene, drone, count):
                 "formation_files": [
                     {"id": "HAKONIWA", "path": "formations/formation-HAKONIWA.json"}
                 ],
-                "timeline": [],
+                "timeline": [
+                    {
+                        "formation": "HAKONIWA",
+                        "duration_sec": 6.0,
+                        "hold_sec": 10.0,
+                    }
+                ],
             }
             recipe._materialize_three_phase_city_show(
                 show,
@@ -222,6 +228,14 @@ def generate_xml(scene, drone, count):
             self.assertEqual(
                 [step["formation"] for step in written["timeline"]],
                 ["CHIIKAWA", "HACHIWARE", "USAGI"],
+            )
+            self.assertEqual(
+                [step["duration_sec"] for step in written["timeline"]],
+                [6.0, 6.0, 6.0],
+            )
+            self.assertEqual(
+                [step["hold_sec"] for step in written["timeline"]],
+                [10.0, 10.0, 10.0],
             )
             for name in (
                 "formation-CHIIKAWA.json",

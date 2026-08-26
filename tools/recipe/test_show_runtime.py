@@ -106,6 +106,7 @@ class ShowRuntimeTest(unittest.TestCase):
                 drone_root=root / "drone",
                 bridge_config_root=root / "bridge",
                 show_ir_path=show_ir,
+                show_ir_max_speed_m_s=20.0,
             )
             launcher = json.loads(launcher_path.read_text())
             assets = {asset["name"]: asset for asset in launcher["assets"]}
@@ -115,9 +116,60 @@ class ShowRuntimeTest(unittest.TestCase):
             self.assertEqual(
                 assets["show-runner"]["args"][ir_index + 1], str(show_ir.resolve())
             )
+            speed_index = assets["show-runner"]["args"].index(
+                "--show-ir-max-speed-m-s"
+            )
+            self.assertEqual(
+                assets["show-runner"]["args"][speed_index + 1], "20.0"
+            )
             self.assertEqual(assets["show-runner"]["env"]["set"]["KEEP"], "1")
             self.assertEqual(assets["web-bridge-fleets"]["args"][1], str((root / "bridge").resolve()))
             self.assertEqual(assets["visual-state-publisher"]["args"], ["vsp.json"])
+
+    def test_show_ir_speed_limit_is_validated_against_timeline(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            show_ir = Path(temporary) / "show-ir.json"
+            write_json(
+                show_ir,
+                {
+                    "timeline": [
+                        {
+                            "time_sec": 0.0,
+                            "states": [
+                                {"drone_id": "Drone-1", "position_m": [0, 0, 0]}
+                            ],
+                        },
+                        {
+                            "time_sec": 2.0,
+                            "states": [
+                                {"drone_id": "Drone-1", "position_m": [3, 4, 10]}
+                            ],
+                        },
+                        {
+                            "time_sec": 12.0,
+                            "states": [
+                                {"drone_id": "Drone-1", "position_m": [3, 4, 10]}
+                            ],
+                        },
+                    ]
+                },
+            )
+            self.assertEqual(
+                show_runtime.validate_show_ir_speed_limit(
+                    show_ir,
+                    maximum_speed_m_s=3.0,
+                    initial_altitude_m=10.0,
+                ),
+                2.5,
+            )
+            with self.assertRaisesRegex(
+                show_runtime.ShowRuntimeError, "required=2.500.*maximum=2.000"
+            ):
+                show_runtime.validate_show_ir_speed_limit(
+                    show_ir,
+                    maximum_speed_m_s=2.0,
+                    initial_altitude_m=10.0,
+                )
 
     def test_browser_receives_the_exact_runtime_show_ir(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

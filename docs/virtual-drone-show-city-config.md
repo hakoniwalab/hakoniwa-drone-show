@@ -75,12 +75,12 @@ ENU各軸のaxis-aligned bounding boxは、回転によってこの値より小�
 | `scenario.altitude_m` | 0.5以上の数値 | City飛行計画が要求する最低クリアランス（m）の既定値です。最終高度はCity colliderと`configure`時の`--altitude-mode`、`--above-city-clearance-m`等から解決され、生成markerとShow IRへ記録されます。 |
 | `scenario.duration_sec` | 0より大きい数値 | 各顔Formationへの移動に割り当てる時間（秒）です。Show Planの各stepの`transition_sec`になります。 |
 | `scenario.hold_sec` | 0以上の数値 | 各顔Formationを到達後に維持する時間（秒）です。Show Planの各stepの`hold_sec`になります。 |
-| `scenario.speed_m_s` | 0より大きい数値 | Show RunnerからFleetへ渡す最大移動速度（m/s）です。移動時間は`duration_sec`でも制約されるため、両方を整合させてください。 |
+| `scenario.max_speed_m_s` | 0より大きい数値 | 機体へ許可する最大移動速度（m/s）です。実際の指令速度は各機体の移動距離を`duration_sec`で割って求めます。configureは必要最大速度がこの値を超える計画をエラーにし、runtimeにも同じ上限を安全策として渡します。値を大きくしても`duration_sec`より早く到着する設定にはなりません。 |
 | `scenario.timeout_sec` | 1以上の数値 | Fleet命令の完了待ちに使うtimeout（秒）です。遅い移動を設定する場合は必要に応じて増やします。 |
 | `scenario.land` | 真偽値 | `true`ならShow終了後に着陸します。現在のCityデモは`false`で、明示的に`stop`するまで最後のFormationを保持します。 |
 
 汎用Business Packが内部で要求する`type`、`word`、`letter_width_m`、
-`letter_height_m`、`letter_gap_m`はShow operatorが互換値を補います。これらは
+`letter_height_m`、`letter_gap_m`、`speed_m_s`はShow operatorが互換値を補います。これらは
 `virtual-drone-show-city.yaml`の公開設定ではなく、指定するとエラーになります。互換用
 FormationもCityの経路クリアランス計算に使われるため、その外形寸法は`scale_m`に
 比例して自動生成されます。

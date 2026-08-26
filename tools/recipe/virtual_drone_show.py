@@ -80,7 +80,9 @@ _LEGACY_BASE_WORD_DIMENSIONS = {
     "letter_gap_m": 4.5,
 }
 _INTERNAL_COMPATIBILITY_FIELDS = (
-    set(_BASE_SCENARIO_COMPATIBILITY) | set(_LEGACY_BASE_WORD_DIMENSIONS)
+    set(_BASE_SCENARIO_COMPATIBILITY)
+    | set(_LEGACY_BASE_WORD_DIMENSIONS)
+    | {"speed_m_s"}
 )
 
 
@@ -112,6 +114,20 @@ def _formation_scale_m(
     return float(value)
 
 
+def _max_speed_m_s(experiment_path: Path) -> float:
+    raw = _BASE_LOAD_SIMPLE_YAML(experiment_path)
+    scenario = raw.get("scenario")
+    value = scenario.get("max_speed_m_s") if isinstance(scenario, dict) else None
+    if (
+        not isinstance(value, (int, float))
+        or isinstance(value, bool)
+        or not math.isfinite(float(value))
+        or not float(value) > 0
+    ):
+        raise base.RecipeError("scenario.max_speed_m_s must be positive")
+    return float(value)
+
+
 def _load_base_compatible_experiment(path: Path):
     """Adapt the Show-facing scale to the generic word Recipe contract."""
 
@@ -120,6 +136,7 @@ def _load_base_compatible_experiment(path: Path):
     if not isinstance(scenario, dict) or "formation" not in scenario:
         return raw
     formation_scale_m = _formation_scale_m(path)
+    maximum_speed_m_s = _max_speed_m_s(path)
     compatibility_fields = sorted(
         set(scenario) & _INTERNAL_COMPATIBILITY_FIELDS
     )
@@ -131,6 +148,7 @@ def _load_base_compatible_experiment(path: Path):
     compatible = copy.deepcopy(raw)
     compatible_scenario = compatible["scenario"]
     del compatible_scenario["formation"]
+    del compatible_scenario["max_speed_m_s"]
     compatible_scenario.update(_BASE_SCENARIO_COMPATIBILITY)
     compatibility_scale = formation_scale_m / _LEGACY_BASE_FORMATION_SCALE_M
     compatible_scenario.update(
@@ -139,6 +157,9 @@ def _load_base_compatible_experiment(path: Path):
             for key, value in _LEGACY_BASE_WORD_DIMENSIONS.items()
         }
     )
+    # The generic Recipe requires speed_m_s. In Show IR mode this value is
+    # forwarded as a maximum speed constraint, not as an independent timeline.
+    compatible_scenario["speed_m_s"] = maximum_speed_m_s
     return compatible
 
 
@@ -192,6 +213,7 @@ def _write_show_launcher(
         / "scenario"
         / "show-ir"
         / "show-ir.json",
+        show_ir_max_speed_m_s=experiment.speed_m_s,
     )
 
 
@@ -342,7 +364,10 @@ def configure(args: argparse.Namespace, experiment_path: Path, drone_root: Path)
         formation_rotation_deg=args.formation_rotation_deg,
         formation_tilt_deg=args.formation_tilt_deg,
     )
-    marker["drone_show"] = {"formation_scale_m": formation_scale_m}
+    marker["drone_show"] = {
+        "formation_scale_m": formation_scale_m,
+        "max_speed_m_s": experiment.speed_m_s,
+    }
     (paths.recipe_config / "mujoco-city-fleet.json").write_text(
         json.dumps(marker, indent=2) + "\n", encoding="utf-8"
     )
@@ -353,6 +378,11 @@ def configure(args: argparse.Namespace, experiment_path: Path, drone_root: Path)
         recipe_config=paths.recipe_config,
         marker=marker,
     )
+    required_speed_m_s = show_runtime.validate_show_ir_speed_limit(
+        show_ir_path,
+        maximum_speed_m_s=experiment.speed_m_s,
+        initial_altitude_m=float(marker["flight_plan"]["resolved_flight_altitude_m"]),
+    )
     launcher = paths.recipe_config / "launcher.json"
     launcher.unlink(missing_ok=True)
     plan = marker["flight_plan"]
@@ -362,6 +392,11 @@ def configure(args: argparse.Namespace, experiment_path: Path, drone_root: Path)
     print(f"Drone PRO              : {drone_root}")
     print(f"MuJoCo process models  : {len(marker['process_models'])}")
     print(f"Formation scale        : {formation_scale_m:g} m")
+    print(
+        "Show speed             : "
+        f"required {required_speed_m_s:.3f} m/s / "
+        f"maximum {experiment.speed_m_s:g} m/s"
+    )
     print(f"Show IR                : {show_ir_path}")
     print("Scenario               : takeoff -> " + " -> ".join(phases) + " -> final hold")
     print(

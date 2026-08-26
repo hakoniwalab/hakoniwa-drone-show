@@ -176,13 +176,13 @@ Formation authoring、Transition planning、256機対応などの新機能はTas
 - [x] SVGから指定機体数のFormation JSONを生成する
 - [x] SVG内の連続する同一点をzero-length segmentとして安全に除外する
 - [x] Show PlanのFormation参照、機体ID、時間、transform、steady LEDをSchema化する
-- [x] 現在の3 Formationと8秒移動・6秒holdを表すShow Planサンプルを追加する
+- [x] 3 Formationと8秒移動・6秒holdを表す汎用Show Planサンプルを追加する
 - [x] Formation、割当、移動時間、hold時間からShow IRをcompileする
 - [x] 現在の3 FormationショーをShow IRから再現する
 - [x] Recipeが実Fleet初期位置と指定機数のFormationからruntime Show IRを自動生成する
 - [x] Show Experience RunnerへoptionalなShow IR adapterを追加する
 - [x] Show IR未指定時はDrone PROの従来`show.json`経路を維持する
-- [ ] MuJoCo実行で3 Formation、8秒移動、6秒holdをAcceptance確認する
+- [ ] MuJoCo実行でCityデモの3 Formation、6秒移動、10秒holdをAcceptance確認する
 
 ## Task 2: Formation制作とオフライン移動計画
 

@@ -19,7 +19,7 @@ scenario:
   altitude_m: 4.0
   duration_sec: 6.0
   hold_sec: 10.0
-  speed_m_s: 20.0
+  max_speed_m_s: 20.0
   timeout_sec: 120.0
   land: false
 

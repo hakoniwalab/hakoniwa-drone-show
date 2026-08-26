@@ -498,6 +498,24 @@ def _materialize_three_phase_city_show(
     drone_count: int,
 ) -> None:
     """Replace the word with three simple character-face formations."""
+    source_timeline = show.get("timeline")
+    if not isinstance(source_timeline, list) or not source_timeline:
+        raise FleetMujocoError("generated HAKONIWA timeline is missing")
+    source_step = source_timeline[0]
+    if not isinstance(source_step, dict):
+        raise FleetMujocoError("generated HAKONIWA timeline step is invalid")
+    try:
+        transition_sec = float(source_step["duration_sec"])
+        hold_sec = float(source_step.get("hold_sec", 0.0))
+    except (KeyError, TypeError, ValueError) as exc:
+        raise FleetMujocoError("generated HAKONIWA timing is invalid") from exc
+    if (
+        not math.isfinite(transition_sec)
+        or not math.isfinite(hold_sec)
+        or transition_sec <= 0.0
+        or hold_sec < 0.0
+    ):
+        raise FleetMujocoError("generated HAKONIWA timing is out of range")
     entries = show.get("formation_files")
     if not isinstance(entries, list) or not entries:
         raise FleetMujocoError("generated HAKONIWA formation is missing")
@@ -548,9 +566,12 @@ def _materialize_three_phase_city_show(
 
     show["formation_files"] = generated_entries
     show["timeline"] = [
-        {"formation": "CHIIKAWA", "duration_sec": 8.0, "hold_sec": 6.0},
-        {"formation": "HACHIWARE", "duration_sec": 8.0, "hold_sec": 6.0},
-        {"formation": "USAGI", "duration_sec": 8.0, "hold_sec": 6.0},
+        {
+            "formation": formation_id,
+            "duration_sec": transition_sec,
+            "hold_sec": hold_sec,
+        }
+        for formation_id in ("CHIIKAWA", "HACHIWARE", "USAGI")
     ]
     show.setdefault("meta", {})["city_show_phases"] = 3
     show_path.write_text(json.dumps(show, indent=2) + "\n", encoding="utf-8")

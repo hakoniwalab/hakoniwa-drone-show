@@ -174,14 +174,15 @@ Show IRは自動生成物です。位置、時刻、Drone ID、LEDが完全展�
 Business Pack workspaceの`config/scenario/show-ir/`へ生成します。
 
 - `formations/*.json`: 指定機数でSVGを再sampleしたFormation
-- `show-plan.json`: Cityの安全高度、3 Formation、8秒移動、6秒holdを記述したPlan
+- `show-plan.json`: Cityの安全高度、3 Formation、6秒移動、10秒holdを記述したPlan
 - `initial-fleet-state.json`: 生成済みFleet設定のNED初期位置をENUへ変換した状態
 - `show-ir.json`: Runnerが読む完全展開済みIR
 
 `doctor`または`start`で生成されるLauncherはShow Experience Runnerへ
 `--show-ir config/scenario/show-ir/show-ir.json`を追加します。IR adapterはframe間を
-DroneGoToの直線移動へ変換し、機体ごとの距離と区間時間から速度を求めます。任意の
-`--show-ir-max-speed-m-s`を指定した場合だけ速度を制限し、到達時間を安全側へ延長します。離陸と
+DroneGoToの直線移動へ変換し、機体ごとの距離と区間時間から速度を求めます。
+`scenario.max_speed_m_s`はconfigure時に計画成立性を検証し、Launcherから
+`--show-ir-max-speed-m-s`としてruntimeへも渡されます。離陸と
 必要なservice初期化は実績のあるDrone PRO preludeを利用し、その後にIR timelineを実行します。
 
 runtime用Show IRはShow専用Web rootへ同一byte列で配置され、SHA-256を

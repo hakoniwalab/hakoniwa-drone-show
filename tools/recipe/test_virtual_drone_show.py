@@ -30,10 +30,12 @@ class VirtualDroneShowTest(unittest.TestCase):
 scenario:
   formation:
     scale_m: 61.325
+  max_speed_m_s: 20.0
 """,
                 encoding="utf-8",
             )
             self.assertEqual(recipe._formation_scale_m(experiment), 61.325)
+            self.assertEqual(recipe._max_speed_m_s(experiment), 20.0)
             compatible = recipe._load_base_compatible_experiment(experiment)
             self.assertNotIn("formation", compatible["scenario"])
             self.assertEqual(compatible["scenario"]["type"], "hakoniwa-word")
@@ -41,6 +43,7 @@ scenario:
             self.assertEqual(compatible["scenario"]["letter_width_m"], 10.0)
             self.assertEqual(compatible["scenario"]["letter_height_m"], 20.0)
             self.assertEqual(compatible["scenario"]["letter_gap_m"], 4.5)
+            self.assertEqual(compatible["scenario"]["speed_m_s"], 20.0)
 
     def test_show_formation_scale_rejects_legacy_dimensions(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -49,6 +52,7 @@ scenario:
                 """scenario:
   formation:
     scale_m: 15.0
+  max_speed_m_s: 20.0
   letter_width_m: 10.0
 """,
                 encoding="utf-8",
@@ -170,7 +174,9 @@ scenario:
             recipe_config.mkdir()
             launcher = recipe_config / "launcher.json"
             launcher.write_text("{}\n", encoding="utf-8")
-            experiment = SimpleNamespace(drone_count=128, process_count=6)
+            experiment = SimpleNamespace(
+                drone_count=128, process_count=6, speed_m_s=20.0
+            )
             paths = SimpleNamespace(recipe_config=recipe_config, recipe_root=root)
             foundation = SimpleNamespace(
                 resolve_workspace=mock.Mock(return_value=paths)
@@ -223,6 +229,11 @@ scenario:
                     / "show-ir"
                     / "show-ir.json",
                 ) as materialize_show_ir,
+                mock.patch.object(
+                    recipe.show_runtime,
+                    "validate_show_ir_speed_limit",
+                    return_value=4.5,
+                ) as validate_speed,
                 redirect_stdout(io.StringIO()),
             ):
                 result = recipe.configure(
@@ -238,13 +249,21 @@ scenario:
             )
             self.assertEqual(city_configure.call_args.kwargs["drone_count"], 128)
             self.assertEqual(city_configure.call_args.kwargs["process_count"], 6)
-            self.assertEqual(marker["drone_show"]["formation_scale_m"], 15.0)
+            self.assertEqual(
+                marker["drone_show"],
+                {"formation_scale_m": 15.0, "max_speed_m_s": 20.0},
+            )
             extend_pdudef.assert_called_once_with(
                 recipe_config / "pdudef" / "drone-pdudef-current.json"
             )
             materialize_show_ir.assert_called_once_with(
                 recipe_config=recipe_config,
                 marker=marker,
+            )
+            validate_speed.assert_called_once_with(
+                recipe_config / "scenario" / "show-ir" / "show-ir.json",
+                maximum_speed_m_s=20.0,
+                initial_altitude_m=115.71,
             )
 
     def test_show_operator_installs_additive_launcher_hook_and_page(self) -> None:
@@ -271,23 +290,31 @@ scenario:
                 "materialize_bridge_config",
                 return_value=Path("/tmp/bridge"),
             ),
-            mock.patch.object(recipe.show_runtime, "materialize_browser"),
+            mock.patch.object(
+                recipe.show_runtime, "materialize_browser"
+            ) as materialize_browser,
             mock.patch.object(
                 recipe.show_runtime,
                 "patch_launcher",
                 return_value=Path("/tmp/launcher.json"),
-            ),
+            ) as patch_launcher,
         ):
             result = recipe._write_show_launcher(
                 paths,
                 Path("/tmp/drone"),
                 Path("/tmp/viewer"),
-                SimpleNamespace(visualization=True),
+                SimpleNamespace(visualization=True, speed_m_s=20.0),
                 "test-system",
             )
         self.assertEqual(result, Path("/tmp/launcher.json"))
         extend.assert_called_once_with(
             Path("/tmp/recipe-config/pdudef/drone-pdudef-current.json")
+        )
+        self.assertNotIn(
+            "show_ir_max_speed_m_s", materialize_browser.call_args.kwargs
+        )
+        self.assertEqual(
+            patch_launcher.call_args.kwargs["show_ir_max_speed_m_s"], 20.0
         )
 
 

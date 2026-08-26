@@ -39,6 +39,75 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def required_show_ir_speed_m_s(
+    show_ir_path: Path, *, initial_altitude_m: float
+) -> float:
+    """Return the maximum speed needed to keep the resolved IR timeline."""
+
+    show_ir = _read_json(show_ir_path.resolve())
+    timeline = show_ir.get("timeline")
+    if not isinstance(timeline, list) or not timeline:
+        raise ShowRuntimeError("Show IR timeline is missing")
+
+    first = timeline[0]
+    first_states = first.get("states") if isinstance(first, dict) else None
+    if not isinstance(first_states, list) or not first_states:
+        raise ShowRuntimeError("Show IR initial states are missing")
+    previous = {
+        state["drone_id"]: (
+            float(state["position_m"][0]),
+            float(state["position_m"][1]),
+            float(initial_altitude_m),
+        )
+        for state in first_states
+    }
+    previous_time = float(first["time_sec"])
+    required_maximum = 0.0
+
+    for frame in timeline[1:]:
+        if not isinstance(frame, dict) or not isinstance(frame.get("states"), list):
+            raise ShowRuntimeError("Show IR timeline frame is invalid")
+        current_time = float(frame["time_sec"])
+        elapsed = current_time - previous_time
+        if elapsed <= 0.0:
+            raise ShowRuntimeError("Show IR timeline times must be increasing")
+        current = {
+            state["drone_id"]: tuple(float(value) for value in state["position_m"])
+            for state in frame["states"]
+        }
+        if set(current) != set(previous):
+            raise ShowRuntimeError("Show IR drone IDs change between frames")
+        frame_maximum = max(
+            math.dist(previous[drone_id], current[drone_id]) / elapsed
+            for drone_id in previous
+        )
+        required_maximum = max(required_maximum, frame_maximum)
+        previous = current
+        previous_time = current_time
+    return required_maximum
+
+
+def validate_show_ir_speed_limit(
+    show_ir_path: Path,
+    *,
+    maximum_speed_m_s: float,
+    initial_altitude_m: float,
+) -> float:
+    """Reject a timeline that cannot meet its times within the speed limit."""
+
+    if not math.isfinite(maximum_speed_m_s) or maximum_speed_m_s <= 0.0:
+        raise ShowRuntimeError("maximum Show IR speed must be positive")
+    required = required_show_ir_speed_m_s(
+        show_ir_path, initial_altitude_m=initial_altitude_m
+    )
+    if required > maximum_speed_m_s + 1e-9:
+        raise ShowRuntimeError(
+            "Show IR cannot meet its timeline within scenario.max_speed_m_s: "
+            f"required={required:.3f} m/s, maximum={maximum_speed_m_s:.3f} m/s"
+        )
+    return required
+
+
 def _materialize_show_ir(*, recipe_config: Path, marker: dict[str, Any]) -> Path:
     """Compile the configured City fleet and Show-owned SVGs into runtime IR."""
 
@@ -468,6 +537,7 @@ def patch_launcher(
     drone_root: Path,
     bridge_config_root: Path,
     show_ir_path: Path | None = None,
+    show_ir_max_speed_m_s: float | None = None,
 ) -> Path:
     launcher = _read_json(launcher_path.resolve())
     assets = launcher.get("assets")
@@ -491,8 +561,20 @@ def patch_launcher(
     while "--show-ir" in args:
         index = args.index("--show-ir")
         del args[index : index + 2]
+    while "--show-ir-max-speed-m-s" in args:
+        index = args.index("--show-ir-max-speed-m-s")
+        del args[index : index + 2]
     if show_ir_path is not None:
         args.extend(["--show-ir", str(show_ir_path.resolve())])
+        if show_ir_max_speed_m_s is not None:
+            if (
+                not math.isfinite(show_ir_max_speed_m_s)
+                or show_ir_max_speed_m_s <= 0.0
+            ):
+                raise ShowRuntimeError("Show IR maximum speed must be positive")
+            args.extend(
+                ["--show-ir-max-speed-m-s", str(float(show_ir_max_speed_m_s))]
+            )
     environment = runner.setdefault("env", {}).setdefault("set", {})
     environment["HAKO_DRONE_ROOT"] = str(drone_root.resolve())
 
