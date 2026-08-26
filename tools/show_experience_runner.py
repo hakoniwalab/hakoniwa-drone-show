@@ -224,6 +224,7 @@ def make_state_machine_class(base_module: ModuleType, hakopy: Any):
             self.status_sequence = 0
             self.status_state: str | None = None
             self.status_error: str | None = None
+            self.status_show_frame_index: int | None = None
             self.last_status_simulation_usec: int | None = None
             self.heartbeat_interval_usec = int(
                 1_000_000 / float(args.show_status_heartbeat_hz)
@@ -439,7 +440,11 @@ def make_state_machine_class(base_module: ModuleType, hakopy: Any):
                 self.last_status_simulation_usec is None
                 or now - self.last_status_simulation_usec >= self.heartbeat_interval_usec
             )
-            changed = state != self.status_state or error != self.status_error
+            changed = (
+                state != self.status_state
+                or error != self.status_error
+                or self.show_frame_index != self.status_show_frame_index
+            )
             if not force and not changed and not heartbeat_due:
                 return
             self.status_sequence += 1
@@ -464,6 +469,7 @@ def make_state_machine_class(base_module: ModuleType, hakopy: Any):
                 raise RuntimeError("failed to write Drone Show status PDU")
             self.status_state = state
             self.status_error = error
+            self.status_show_frame_index = self.show_frame_index
             self.last_status_simulation_usec = now
 
         def _read_command(self) -> dict[str, Any] | None:

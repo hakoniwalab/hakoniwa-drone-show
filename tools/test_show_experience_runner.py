@@ -122,6 +122,23 @@ class ShowExperienceRunnerTest(unittest.TestCase):
         self.runner.step_once()
         self.assertEqual(self.runner.base_step_count, 1)
 
+    def test_show_frame_change_publishes_before_heartbeat(self) -> None:
+        self.runner._publish_status("running", force=True)
+        published = len(self.hakopy.status_frames)
+
+        self.hakopy.now_usec = 100_000
+        self.runner._publish_status("running")
+        self.assertEqual(len(self.hakopy.status_frames), published)
+
+        self.runner.show_frame_index = 1
+        self.runner._publish_status("running")
+        self.assertEqual(len(self.hakopy.status_frames), published + 1)
+        status = protocol.decode_frame(self.hakopy.status_frames[-1])
+        self.assertEqual(status["show_frame_index"], 1)
+
+        self.runner._publish_status("running")
+        self.assertEqual(len(self.hakopy.status_frames), published + 1)
+
     def test_show_ir_control_argument_is_not_forwarded_to_drone_pro(self) -> None:
         control, remaining = _control_args(
             ["--show-ir", "show-ir.json", "--show-json", "show.json"]
