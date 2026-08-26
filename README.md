@@ -106,6 +106,11 @@ workspaceを再生成してから起動してください。
 既定配置を変更する場合は、`HAKONIWA_BUSINESS_PACK_ROOT`環境変数と
 `--drone-root`、`--viewer-root`、`--experiment`を使用します。
 
+既定experimentのFormationサイズ、速度、待機時間、プロセス数など、YAML全項目の意味と
+変更後の再生成手順は
+[`docs/virtual-drone-show-city-config.md`](docs/virtual-drone-show-city-config.md)を
+参照してください。
+
 移行baseline、主要生成物hash、確認結果は
 [`docs/task0-baseline.md`](docs/task0-baseline.md)に記録しています。
 Fleet制御は既存の`hakoniwa-drone-pro`を利用し、そのShow Runnerを本リポジトリへ

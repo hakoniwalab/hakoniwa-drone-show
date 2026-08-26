@@ -22,6 +22,43 @@ SPEC.loader.exec_module(recipe)
 
 
 class VirtualDroneShowTest(unittest.TestCase):
+    def test_show_formation_scale_is_adapted_for_base_recipe(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            experiment = Path(temporary) / "experiment.yaml"
+            experiment.write_text(
+                """version: 1
+scenario:
+  formation:
+    scale_m: 61.325
+""",
+                encoding="utf-8",
+            )
+            self.assertEqual(recipe._formation_scale_m(experiment), 61.325)
+            compatible = recipe._load_base_compatible_experiment(experiment)
+            self.assertNotIn("formation", compatible["scenario"])
+            self.assertEqual(compatible["scenario"]["type"], "hakoniwa-word")
+            self.assertEqual(compatible["scenario"]["word"], "HAKONIWA")
+            self.assertEqual(compatible["scenario"]["letter_width_m"], 10.0)
+            self.assertEqual(compatible["scenario"]["letter_height_m"], 20.0)
+            self.assertEqual(compatible["scenario"]["letter_gap_m"], 4.5)
+
+    def test_show_formation_scale_rejects_legacy_dimensions(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            experiment = Path(temporary) / "experiment.yaml"
+            experiment.write_text(
+                """scenario:
+  formation:
+    scale_m: 15.0
+  letter_width_m: 10.0
+""",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(
+                recipe.base.RecipeError,
+                "cannot be combined with internal compatibility fields",
+            ):
+                recipe._load_base_compatible_experiment(experiment)
+
     def test_show_page_keeps_map_in_sidebar_and_threejs_full_size(self) -> None:
         page = (recipe.SHOW_ROOT / "web" / "index.html").read_text(encoding="utf-8")
         style = (recipe.SHOW_ROOT / "web" / "drone-show.css").read_text(
@@ -46,6 +83,17 @@ class VirtualDroneShowTest(unittest.TestCase):
             recipe._viewer_root(None),
             (recipe.SHOW_ROOT.parent / "hakoniwa-threejs-drone").resolve(),
         )
+
+    def test_default_experiment_resolves_show_scale_and_base_compatibility(self) -> None:
+        self.assertEqual(
+            recipe._formation_scale_m(recipe.DEFAULT_EXPERIMENT), 15.33125
+        )
+        experiment = recipe.base.resolve_experiment(recipe.DEFAULT_EXPERIMENT)
+        self.assertEqual(experiment.word, "HAKONIWA")
+        self.assertEqual(experiment.letter_width_m, 2.5)
+        self.assertEqual(experiment.letter_height_m, 5.0)
+        self.assertEqual(experiment.letter_gap_m, 1.125)
+        self.assertEqual(experiment.speed_m_s, 20.0)
 
     def test_configure_requires_city_world(self) -> None:
         stderr = io.StringIO()
@@ -128,7 +176,7 @@ class VirtualDroneShowTest(unittest.TestCase):
                 resolve_workspace=mock.Mock(return_value=paths)
             )
             marker = {
-                "process_models": [object()] * 6,
+                "process_models": [{}] * 6,
                 "flight_plan": {
                     "show_phases": ["CHIIKAWA", "HACHIWARE", "USAGI"],
                     "resolved_flight_altitude_m": 115.71,
@@ -150,6 +198,9 @@ class VirtualDroneShowTest(unittest.TestCase):
                 mock.patch.object(
                     recipe.base, "configure", return_value=0
                 ) as base_configure,
+                mock.patch.object(
+                    recipe, "_formation_scale_m", return_value=15.0
+                ),
                 mock.patch.object(
                     recipe.base, "resolve_experiment", return_value=experiment
                 ),
@@ -187,6 +238,7 @@ class VirtualDroneShowTest(unittest.TestCase):
             )
             self.assertEqual(city_configure.call_args.kwargs["drone_count"], 128)
             self.assertEqual(city_configure.call_args.kwargs["process_count"], 6)
+            self.assertEqual(marker["drone_show"]["formation_scale_m"], 15.0)
             extend_pdudef.assert_called_once_with(
                 recipe_config / "pdudef" / "drone-pdudef-current.json"
             )

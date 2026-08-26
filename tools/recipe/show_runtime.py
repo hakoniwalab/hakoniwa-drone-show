@@ -39,27 +39,6 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def _legacy_formation_scale(show_path: Path, show: dict[str, Any]) -> float:
-    spans: list[float] = []
-    for reference in show.get("formation_files", []):
-        if not isinstance(reference, dict) or not isinstance(reference.get("path"), str):
-            continue
-        formation_path = (show_path.parent / reference["path"]).resolve()
-        formation = _read_json(formation_path)
-        points = formation.get("points", [])
-        for axis in range(3):
-            values = [
-                float(point[axis])
-                for point in points
-                if isinstance(point, list) and len(point) > axis
-            ]
-            if values:
-                spans.append(max(values) - min(values))
-    if not spans or max(spans) <= 0.0:
-        raise ShowRuntimeError("legacy City show has no usable formation scale")
-    return max(spans)
-
-
 def _materialize_show_ir(*, recipe_config: Path, marker: dict[str, Any]) -> Path:
     """Compile the configured City fleet and Show-owned SVGs into runtime IR."""
 
@@ -102,7 +81,12 @@ def _materialize_show_ir(*, recipe_config: Path, marker: dict[str, Any]) -> Path
     legacy_timeline = legacy_show.get("timeline")
     if not isinstance(legacy_timeline, list) or len(legacy_timeline) != 3:
         raise ShowRuntimeError("City show must provide three legacy timing steps")
-    scale_m = _legacy_formation_scale(legacy_show_path, legacy_show)
+    show_config = marker.get("drone_show")
+    if not isinstance(show_config, dict):
+        raise ShowRuntimeError("City marker has no drone_show configuration")
+    scale_m = float(show_config["formation_scale_m"])
+    if not scale_m > 0:
+        raise ShowRuntimeError("drone_show.formation_scale_m must be positive")
     flight_plan = marker.get("flight_plan", {})
     flight_altitude_m = float(flight_plan["resolved_flight_altitude_m"])
     legacy_audience_tilt_deg = float(

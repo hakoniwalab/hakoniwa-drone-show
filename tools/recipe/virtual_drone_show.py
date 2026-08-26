@@ -9,8 +9,10 @@ generic Recipe workspace after the base configuration has been generated.
 from __future__ import annotations
 
 import argparse
+import copy
 import importlib.util
 import json
+import math
 import os
 import platform
 import subprocess
@@ -66,6 +68,84 @@ base.MAP_VIEWER_URL_BASE = (
     "&viewerConfigName=viewer-config-fleets.json"
 )
 _BASE_WRITE_LAUNCHER = base.write_launcher
+_BASE_LOAD_SIMPLE_YAML = base.load_simple_yaml
+_BASE_SCENARIO_COMPATIBILITY = {
+    "type": "hakoniwa-word",
+    "word": "HAKONIWA",
+}
+_LEGACY_BASE_FORMATION_SCALE_M = 61.325
+_LEGACY_BASE_WORD_DIMENSIONS = {
+    "letter_width_m": 10.0,
+    "letter_height_m": 20.0,
+    "letter_gap_m": 4.5,
+}
+_INTERNAL_COMPATIBILITY_FIELDS = (
+    set(_BASE_SCENARIO_COMPATIBILITY) | set(_LEGACY_BASE_WORD_DIMENSIONS)
+)
+
+
+def _formation_scale_m(
+    experiment_path: Path, override: float | None = None
+) -> float:
+    if override is not None:
+        if not math.isfinite(override) or override <= 0:
+            raise base.RecipeError("--formation-scale must be positive")
+        return float(override)
+    raw = _BASE_LOAD_SIMPLE_YAML(experiment_path)
+    scenario = raw.get("scenario")
+    formation = scenario.get("formation") if isinstance(scenario, dict) else None
+    if not isinstance(formation, dict):
+        raise base.RecipeError("scenario.formation must be a mapping")
+    unknown = sorted(set(formation) - {"scale_m"})
+    if unknown:
+        raise base.RecipeError(
+            "scenario.formation has unknown fields: " + ", ".join(unknown)
+        )
+    value = formation.get("scale_m")
+    if (
+        not isinstance(value, (int, float))
+        or isinstance(value, bool)
+        or not math.isfinite(float(value))
+        or not float(value) > 0
+    ):
+        raise base.RecipeError("scenario.formation.scale_m must be positive")
+    return float(value)
+
+
+def _load_base_compatible_experiment(path: Path):
+    """Adapt the Show-facing scale to the generic word Recipe contract."""
+
+    raw = _BASE_LOAD_SIMPLE_YAML(path)
+    scenario = raw.get("scenario")
+    if not isinstance(scenario, dict) or "formation" not in scenario:
+        return raw
+    formation_scale_m = _formation_scale_m(path)
+    compatibility_fields = sorted(
+        set(scenario) & _INTERNAL_COMPATIBILITY_FIELDS
+    )
+    if compatibility_fields:
+        raise base.RecipeError(
+            "scenario.formation cannot be combined with internal compatibility fields: "
+            + ", ".join(compatibility_fields)
+        )
+    compatible = copy.deepcopy(raw)
+    compatible_scenario = compatible["scenario"]
+    del compatible_scenario["formation"]
+    compatible_scenario.update(_BASE_SCENARIO_COMPATIBILITY)
+    compatibility_scale = formation_scale_m / _LEGACY_BASE_FORMATION_SCALE_M
+    compatible_scenario.update(
+        {
+            key: value * compatibility_scale
+            for key, value in _LEGACY_BASE_WORD_DIMENSIONS.items()
+        }
+    )
+    return compatible
+
+
+# Business Pack still builds a compatibility HAKONIWA scenario. Keep that
+# private adapter at the operator boundary; the public Show configuration owns
+# only the final Formation's absolute maximum span.
+base.load_simple_yaml = _load_base_compatible_experiment
 
 
 def _write_show_launcher(
@@ -145,7 +225,11 @@ def parser() -> argparse.ArgumentParser:
     result.add_argument("--process-count", type=int)
     result.add_argument("--spawn-altitude-m", type=float, default=0.20)
     result.add_argument("--spawn-spacing-m", type=float, default=1.0)
-    result.add_argument("--formation-scale", type=float)
+    result.add_argument(
+        "--formation-scale",
+        type=float,
+        help="override scenario.formation.scale_m in meters",
+    )
     result.add_argument("--formation-rotation-deg", type=float, default=90.0)
     result.add_argument("--formation-tilt-deg", type=float, default=15.0)
     result.add_argument(
@@ -227,12 +311,14 @@ def configure(args: argparse.Namespace, experiment_path: Path, drone_root: Path)
         raise base.RecipeError("configure requires --mujoco-city-world")
     _require_terminated_launcher_for_configure()
     city_world = args.mujoco_city_world.expanduser().resolve()
+    formation_scale_m = _formation_scale_m(
+        experiment_path, override=args.formation_scale
+    )
     rc = base.configure(
         experiment_path,
         drone_root,
         drone_count_override=args.drone_count,
         process_count_override=args.process_count,
-        formation_scale_override=args.formation_scale,
     )
     if rc != 0:
         return rc
@@ -240,7 +326,6 @@ def configure(args: argparse.Namespace, experiment_path: Path, drone_root: Path)
         experiment_path,
         drone_count_override=args.drone_count,
         process_count_override=args.process_count,
-        formation_scale_override=args.formation_scale,
     )
     foundation = base.load_foundation_module()
     paths = foundation.resolve_workspace(base.ROOT, base.RECIPE_ID)
@@ -257,6 +342,10 @@ def configure(args: argparse.Namespace, experiment_path: Path, drone_root: Path)
         formation_rotation_deg=args.formation_rotation_deg,
         formation_tilt_deg=args.formation_tilt_deg,
     )
+    marker["drone_show"] = {"formation_scale_m": formation_scale_m}
+    (paths.recipe_config / "mujoco-city-fleet.json").write_text(
+        json.dumps(marker, indent=2) + "\n", encoding="utf-8"
+    )
     show_runtime.extend_asset_pdudef(
         paths.recipe_config / "pdudef" / "drone-pdudef-current.json"
     )
@@ -272,6 +361,7 @@ def configure(args: argparse.Namespace, experiment_path: Path, drone_root: Path)
     print(f"City World             : {city_world}")
     print(f"Drone PRO              : {drone_root}")
     print(f"MuJoCo process models  : {len(marker['process_models'])}")
+    print(f"Formation scale        : {formation_scale_m:g} m")
     print(f"Show IR                : {show_ir_path}")
     print("Scenario               : takeoff -> " + " -> ".join(phases) + " -> final hold")
     print(
