@@ -879,8 +879,8 @@ def materialize_fleet_config(
     """Replace a configured non-ICRA fleet with its MuJoCo equivalent."""
     if not math.isfinite(formation_rotation_deg):
         raise FleetMujocoError("formation_rotation_deg must be finite")
-    if not math.isfinite(formation_tilt_deg) or not 0.0 <= formation_tilt_deg <= 35.0:
-        raise FleetMujocoError("formation_tilt_deg must be in [0, 35]")
+    if not math.isfinite(formation_tilt_deg) or not 0.0 <= formation_tilt_deg <= 85.0:
+        raise FleetMujocoError("formation_tilt_deg must be in [0, 85]")
     if not 0.18 <= spawn_altitude_m <= 2.0:
         raise FleetMujocoError(
             "spawn_altitude_m is the body-origin clearance above terrain and "

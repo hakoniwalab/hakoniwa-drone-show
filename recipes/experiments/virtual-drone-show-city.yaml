@@ -24,6 +24,7 @@ viewer:
 scenario:
   formation:
     scale_m: 15.33125
+    audience_tilt_deg: 60.0
   altitude_m: 4.0
   duration_sec: 6.0
   hold_sec: 10.0

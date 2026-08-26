@@ -305,7 +305,7 @@ class ShowRuntimeTest(unittest.TestCase):
                     "drone_show": {"formation_scale_m": 15.0},
                     "flight_plan": {
                         "resolved_flight_altitude_m": 50.0,
-                        "formation_audience_tilt_deg": 15.0,
+                        "formation_audience_tilt_deg": 60.0,
                     },
                 },
             )
@@ -330,7 +330,7 @@ class ShowRuntimeTest(unittest.TestCase):
                 (show_ir_path.parent / "show-plan.json").read_text(encoding="utf-8")
             )
             self.assertEqual(plan["defaults"]["transform"]["scale_m"], 15.0)
-            self.assertEqual(plan["defaults"]["transform"]["tilt_deg"], 75.0)
+            self.assertEqual(plan["defaults"]["transform"]["tilt_deg"], 30.0)
 
 
 if __name__ == "__main__":

@@ -98,7 +98,7 @@ def _formation_scale_m(
     formation = scenario.get("formation") if isinstance(scenario, dict) else None
     if not isinstance(formation, dict):
         raise base.RecipeError("scenario.formation must be a mapping")
-    unknown = sorted(set(formation) - {"scale_m"})
+    unknown = sorted(set(formation) - {"scale_m", "audience_tilt_deg"})
     if unknown:
         raise base.RecipeError(
             "scenario.formation has unknown fields: " + ", ".join(unknown)
@@ -111,6 +111,30 @@ def _formation_scale_m(
         or not float(value) > 0
     ):
         raise base.RecipeError("scenario.formation.scale_m must be positive")
+    return float(value)
+
+
+def _formation_audience_tilt_deg(
+    experiment_path: Path, override: float | None = None
+) -> float:
+    if override is not None:
+        value = override
+    else:
+        raw = _BASE_LOAD_SIMPLE_YAML(experiment_path)
+        scenario = raw.get("scenario")
+        formation = scenario.get("formation") if isinstance(scenario, dict) else None
+        if not isinstance(formation, dict):
+            raise base.RecipeError("scenario.formation must be a mapping")
+        value = formation.get("audience_tilt_deg", 15.0)
+    if (
+        not isinstance(value, (int, float))
+        or isinstance(value, bool)
+        or not math.isfinite(float(value))
+        or not 0.0 <= float(value) <= 85.0
+    ):
+        raise base.RecipeError(
+            "scenario.formation.audience_tilt_deg must be between 0 and 85"
+        )
     return float(value)
 
 
@@ -212,6 +236,7 @@ def _load_base_compatible_experiment(path: Path):
         compatible.pop("viewer", None)
         return compatible
     formation_scale_m = _formation_scale_m(path)
+    _formation_audience_tilt_deg(path)
     maximum_speed_m_s = _max_speed_m_s(path)
     compatibility_fields = sorted(
         set(scenario) & _INTERNAL_COMPATIBILITY_FIELDS
@@ -331,7 +356,12 @@ def parser() -> argparse.ArgumentParser:
         help="override scenario.formation.scale_m in meters",
     )
     result.add_argument("--formation-rotation-deg", type=float, default=90.0)
-    result.add_argument("--formation-tilt-deg", type=float, default=15.0)
+    result.add_argument(
+        "--formation-tilt-deg",
+        type=float,
+        default=None,
+        help="override scenario.formation.audience_tilt_deg",
+    )
     result.add_argument(
         "--altitude-mode",
         choices=["route-clearance", "city-max-clearance"],
@@ -414,6 +444,9 @@ def configure(args: argparse.Namespace, experiment_path: Path, drone_root: Path)
     formation_scale_m = _formation_scale_m(
         experiment_path, override=args.formation_scale
     )
+    formation_audience_tilt_deg = _formation_audience_tilt_deg(
+        experiment_path, override=args.formation_tilt_deg
+    )
     viewer_settings = _viewer_settings(experiment_path)
     rc = base.configure(
         experiment_path,
@@ -441,7 +474,7 @@ def configure(args: argparse.Namespace, experiment_path: Path, drone_root: Path)
         above_city_clearance_m=args.above_city_clearance_m,
         process_count=experiment.process_count,
         formation_rotation_deg=args.formation_rotation_deg,
-        formation_tilt_deg=args.formation_tilt_deg,
+        formation_tilt_deg=formation_audience_tilt_deg,
     )
     marker["drone_show"] = {
         "formation_scale_m": formation_scale_m,
@@ -472,6 +505,7 @@ def configure(args: argparse.Namespace, experiment_path: Path, drone_root: Path)
     print(f"Drone PRO              : {drone_root}")
     print(f"MuJoCo process models  : {len(marker['process_models'])}")
     print(f"Formation scale        : {formation_scale_m:g} m")
+    print(f"Formation audience tilt: {formation_audience_tilt_deg:g} deg")
     print(
         "Show speed             : "
         f"required {required_speed_m_s:.3f} m/s / "

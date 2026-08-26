@@ -35,6 +35,9 @@ scenario:
                 encoding="utf-8",
             )
             self.assertEqual(recipe._formation_scale_m(experiment), 61.325)
+            self.assertEqual(
+                recipe._formation_audience_tilt_deg(experiment), 15.0
+            )
             self.assertEqual(recipe._max_speed_m_s(experiment), 20.0)
             compatible = recipe._load_base_compatible_experiment(experiment)
             self.assertNotIn("formation", compatible["scenario"])
@@ -94,6 +97,10 @@ scenario:
         self.assertEqual(
             recipe._formation_scale_m(recipe.DEFAULT_EXPERIMENT), 15.33125
         )
+        self.assertEqual(
+            recipe._formation_audience_tilt_deg(recipe.DEFAULT_EXPERIMENT),
+            60.0,
+        )
         experiment = recipe.base.resolve_experiment(recipe.DEFAULT_EXPERIMENT)
         self.assertEqual(experiment.word, "HAKONIWA")
         self.assertEqual(experiment.letter_width_m, 2.5)
@@ -128,6 +135,22 @@ scenario:
                 recipe.base.RecipeError, "pitch_deg must be between"
             ):
                 recipe._viewer_settings(experiment)
+
+    def test_formation_audience_tilt_rejects_out_of_range_value(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            experiment = Path(temporary) / "experiment.yaml"
+            experiment.write_text(
+                """scenario:
+  formation:
+    scale_m: 15
+    audience_tilt_deg: 86
+""",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(
+                recipe.base.RecipeError, "must be between 0 and 85"
+            ):
+                recipe._formation_audience_tilt_deg(experiment)
 
     def test_configure_requires_city_world(self) -> None:
         stderr = io.StringIO()
@@ -239,6 +262,11 @@ scenario:
                 ),
                 mock.patch.object(
                     recipe,
+                    "_formation_audience_tilt_deg",
+                    return_value=60.0,
+                ),
+                mock.patch.object(
+                    recipe,
                     "_viewer_settings",
                     return_value={"initial_mode": "free"},
                 ),
@@ -284,6 +312,9 @@ scenario:
             )
             self.assertEqual(city_configure.call_args.kwargs["drone_count"], 128)
             self.assertEqual(city_configure.call_args.kwargs["process_count"], 6)
+            self.assertEqual(
+                city_configure.call_args.kwargs["formation_tilt_deg"], 60.0
+            )
             self.assertEqual(
                 marker["drone_show"],
                 {
