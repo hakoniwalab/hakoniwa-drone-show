@@ -22,6 +22,17 @@ SPEC.loader.exec_module(recipe)
 
 
 class VirtualDroneShowTest(unittest.TestCase):
+    def test_show_page_keeps_map_in_sidebar_and_threejs_full_size(self) -> None:
+        page = (recipe.SHOW_ROOT / "web" / "index.html").read_text(encoding="utf-8")
+        style = (recipe.SHOW_ROOT / "web" / "drone-show.css").read_text(
+            encoding="utf-8"
+        )
+        panel_start = page.index('<aside id="show-panel">')
+        panel_end = page.index("</aside>", panel_start)
+        self.assertIn('<section id="map-panel"', page[panel_start:panel_end])
+        self.assertNotIn('id="splitter"', page)
+        self.assertIn("#three-root { width: 100%; height: 100%;", style)
+
     def test_default_sources_use_sibling_repositories(self) -> None:
         self.assertEqual(
             recipe.BUSINESS_PACK_ROOT,

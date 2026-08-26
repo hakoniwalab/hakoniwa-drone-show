@@ -33,38 +33,15 @@
         <div><dt>通信</dt><dd>WebSocket :8765</dd></div>
       </dl>
       <p class="hint">すべての機体が表示され、開始待ちになるとボタンが有効になります。</p>
+      <section id="map-panel" aria-label="機体位置マップ">
+        <p class="map-label">機体位置</p>
+        <div id="map"></div>
+      </section>
     </aside>
     <section id="viewer-area">
-      <div id="map"></div>
-      <div id="splitter" aria-hidden="true"></div>
       <div id="three-root"></div>
     </section>
   </main>
   <script type="module" src="./drone-show-app.mjs"></script>
-  <script>
-    (() => {
-      const area = document.getElementById('viewer-area');
-      const map = document.getElementById('map');
-      const three = document.getElementById('three-root');
-      const splitter = document.getElementById('splitter');
-      let dragging = false;
-      splitter.addEventListener('mousedown', (event) => {
-        event.preventDefault();
-        dragging = true;
-      });
-      window.addEventListener('mousemove', (event) => {
-        if (!dragging) return;
-        const rect = area.getBoundingClientRect();
-        const top = Math.max(100, Math.min(rect.height - 100, event.clientY - rect.top));
-        map.style.height = `${top}px`;
-        three.style.height = `${rect.height - top - splitter.offsetHeight}px`;
-      });
-      window.addEventListener('mouseup', () => {
-        if (!dragging) return;
-        dragging = false;
-        window.dispatchEvent(new Event('hakoniwa-layout-changed'));
-      });
-    })();
-  </script>
 </body>
 </html>
