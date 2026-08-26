@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hakoniwa Virtual Drone Show</title>
+  <script src="https://cdn.jsdelivr.net/npm/proj4@2.9.2/dist/proj4.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script async src="https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js"></script>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+  <link rel="stylesheet" href="./drone-show.css">
+</head>
+<body class="night-mode">
+  <main id="layout">
+    <aside id="show-panel">
+      <p class="eyebrow">HAKONIWA</p>
+      <h1>Virtual Drone Show</h1>
+      <div class="status-card">
+        <span id="show-state" data-state="connecting">接続中</span>
+        <p id="show-detail">起動しています</p>
+      </div>
+      <button id="show-start" type="button" disabled>ドローンショー開始</button>
+      <dl>
+        <div><dt>表示中の機体</dt><dd id="drone-count">0 / 0</dd></div>
+        <div><dt>通信</dt><dd>WebSocket :8765</dd></div>
+      </dl>
+      <p class="hint">すべての機体が表示され、開始待ちになるとボタンが有効になります。</p>
+    </aside>
+    <section id="viewer-area">
+      <div id="map"></div>
+      <div id="splitter" aria-hidden="true"></div>
+      <div id="three-root"></div>
+    </section>
+  </main>
+  <script type="module" src="./drone-show-app.mjs"></script>
+  <script>
+    (() => {
+      const area = document.getElementById('viewer-area');
+      const map = document.getElementById('map');
+      const three = document.getElementById('three-root');
+      const splitter = document.getElementById('splitter');
+      let dragging = false;
+      splitter.addEventListener('mousedown', (event) => {
+        event.preventDefault();
+        dragging = true;
+      });
+      window.addEventListener('mousemove', (event) => {
+        if (!dragging) return;
+        const rect = area.getBoundingClientRect();
+        const top = Math.max(100, Math.min(rect.height - 100, event.clientY - rect.top));
+        map.style.height = `${top}px`;
+        three.style.height = `${rect.height - top - splitter.offsetHeight}px`;
+      });
+      window.addEventListener('mouseup', () => {
+        if (!dragging) return;
+        dragging = false;
+        window.dispatchEvent(new Event('hakoniwa-layout-changed'));
+      });
+    })();
+  </script>
+</body>
+</html>

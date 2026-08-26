@@ -80,4 +80,18 @@ python3 tools/recipe/virtual_drone_show.py stop
 Fleet制御は既存の`hakoniwa-drone-pro`を利用し、そのShow Runnerを本リポジトリへ
 複製しません。
 
+## Task 1: ブラウザから開始する
+
+Task 1対応Recipeでは、`start`しても自動的に離陸しません。`open-viewer`で専用画面を
+開くとWebSocketへ自動接続し、Show Runnerと全機の初期位置が揃った時点で
+`ドローンショー開始`ボタンが有効になります。
+
+専用画面とShow Experience Runnerは、既存WebBridgeの同じTCP port 8765を使います。
+開始・状態通知用に別のWebSocket serverやportを追加しません。通信frame、PDU channel、
+重複STARTの扱いは[`docs/show-control-protocol.md`](docs/show-control-protocol.md)を
+参照してください。
+
+既存の汎用Map Viewer画面とICRA実行経路は変更せず、専用画面はRecipe生成物の
+`/drone-show/index.html`として追加されます。
+
 現在の設計・実装タスクは[`task.md`](task.md)を参照してください。

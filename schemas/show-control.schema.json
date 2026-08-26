@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Hakoniwa Drone Show control message",
+  "oneOf": [
+    {"$ref": "#/$defs/startCommand"},
+    {"$ref": "#/$defs/status"}
+  ],
+  "$defs": {
+    "common": {
+      "type": "object",
+      "properties": {
+        "schema_version": {"const": 1},
+        "protocol": {"const": "hakoniwa.drone-show-control"},
+        "run_id": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
+        "show_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "sequence": {"type": "integer", "minimum": 1}
+      }
+    },
+    "startCommand": {
+      "allOf": [
+        {"$ref": "#/$defs/common"},
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["schema_version", "protocol", "kind", "type", "run_id", "show_sha256", "sequence"],
+          "properties": {
+            "schema_version": {"const": 1},
+            "protocol": {"const": "hakoniwa.drone-show-control"},
+            "kind": {"const": "command"},
+            "type": {"const": "START"},
+            "run_id": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
+            "show_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+            "sequence": {"type": "integer", "minimum": 1}
+          }
+        }
+      ]
+    },
+    "status": {
+      "allOf": [
+        {"$ref": "#/$defs/common"},
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["schema_version", "protocol", "kind", "state", "run_id", "show_sha256", "sequence", "simulation_time_usec"],
+          "properties": {
+            "schema_version": {"const": 1},
+            "protocol": {"const": "hakoniwa.drone-show-control"},
+            "kind": {"const": "status"},
+            "state": {"enum": ["initializing", "waiting", "running", "completed", "failed"]},
+            "run_id": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
+            "show_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+            "sequence": {"type": "integer", "minimum": 1},
+            "simulation_time_usec": {"type": "integer", "minimum": 0},
+            "error": {"type": "string", "minLength": 1, "maxLength": 256}
+          },
+          "allOf": [
+            {
+              "if": {"properties": {"state": {"const": "failed"}}, "required": ["state"]},
+              "then": {"required": ["error"]},
+              "else": {"not": {"required": ["error"]}}
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -33,6 +33,8 @@ for search_path in (
 ):
     if str(search_path) not in sys.path:
         sys.path.insert(0, str(search_path))
+if str(SHOW_ROOT) not in sys.path:
+    sys.path.insert(0, str(SHOW_ROOT))
 
 
 def _load_module(name: str, path: Path):
@@ -53,7 +55,57 @@ city = _load_module(
     "hakoniwa_drone_show_mujoco_city",
     Path(__file__).with_name("drone_fleet_mujoco_city.py"),
 )
+from tools.recipe import show_runtime
+
 base.OPERATOR_COMMAND = "python ../hakoniwa-drone-show/tools/recipe/virtual_drone_show.py"
+base.MAP_VIEWER_URL_BASE = (
+    "http://127.0.0.1:8000/drone-show/index.html"
+    "?threejsRoot=/thirdparty/hakoniwa-threejs-drone"
+    "&viewerConfigName=viewer-config-fleets.json"
+)
+_BASE_WRITE_LAUNCHER = base.write_launcher
+
+
+def _write_show_launcher(
+    paths,
+    drone_root: Path,
+    viewer_root: Path,
+    experiment,
+    system_name: str,
+) -> Path:
+    """Apply the Show-owned runtime extension after generic materialization."""
+
+    if not experiment.visualization:
+        raise base.RecipeError(
+            "the browser-gated Drone Show requires runtime.visualization=true"
+        )
+    launcher = _BASE_WRITE_LAUNCHER(
+        paths, drone_root, viewer_root, experiment, system_name
+    )
+    # ``doctor`` and ``start`` regenerate the Launcher without necessarily
+    # running ``configure`` first. Keep the Show-owned SHM slots present for
+    # those entry points as well as for a fresh configure.
+    show_runtime.extend_asset_pdudef(
+        paths.recipe_config / "pdudef" / "drone-pdudef-current.json"
+    )
+    bridge_root = show_runtime.materialize_bridge_config(
+        base.bridge_config_root(paths),
+        paths.recipe_config / "web-bridge-drone-show",
+    )
+    show_runtime.materialize_browser(
+        show_root=SHOW_ROOT,
+        web_root=paths.recipe_root / "web" / "map-viewer",
+        marker_path=paths.recipe_config / "mujoco-city-fleet.json",
+    )
+    return show_runtime.patch_launcher(
+        launcher,
+        show_runner=SHOW_ROOT / "tools" / "show_experience_runner.py",
+        drone_root=drone_root,
+        bridge_config_root=bridge_root,
+    )
+
+
+base.write_launcher = _write_show_launcher
 
 
 def parser() -> argparse.ArgumentParser:
@@ -154,6 +206,9 @@ def configure(args: argparse.Namespace, experiment_path: Path, drone_root: Path)
         formation_rotation_deg=args.formation_rotation_deg,
         formation_tilt_deg=args.formation_tilt_deg,
     )
+    show_runtime.extend_asset_pdudef(
+        paths.recipe_config / "pdudef" / "drone-pdudef-current.json"
+    )
     launcher = paths.recipe_config / "launcher.json"
     launcher.unlink(missing_ok=True)
     plan = marker["flight_plan"]
@@ -231,7 +286,12 @@ def main(argv: list[str] | None = None) -> int:
             args.timeout_sec,
             drone_count_override=args.drone_count,
         )
-    except (base.RecipeError, city.FleetMujocoError, RuntimeError) as exc:
+    except (
+        base.RecipeError,
+        city.FleetMujocoError,
+        show_runtime.ShowRuntimeError,
+        RuntimeError,
+    ) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
 

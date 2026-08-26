@@ -90,6 +90,9 @@ class VirtualDroneShowTest(unittest.TestCase):
                     "configure_single_host_fleet",
                     return_value=marker,
                 ) as city_configure,
+                mock.patch.object(
+                    recipe.show_runtime, "extend_asset_pdudef"
+                ) as extend_pdudef,
                 redirect_stdout(io.StringIO()),
             ):
                 result = recipe.configure(
@@ -105,6 +108,52 @@ class VirtualDroneShowTest(unittest.TestCase):
             )
             self.assertEqual(city_configure.call_args.kwargs["drone_count"], 128)
             self.assertEqual(city_configure.call_args.kwargs["process_count"], 6)
+            extend_pdudef.assert_called_once_with(
+                recipe_config / "pdudef" / "drone-pdudef-current.json"
+            )
+
+    def test_show_operator_installs_additive_launcher_hook_and_page(self) -> None:
+        self.assertIs(recipe.base.write_launcher, recipe._write_show_launcher)
+        self.assertIn("/drone-show/index.html", recipe.base.MAP_VIEWER_URL_BASE)
+
+    def test_launcher_hook_keeps_show_pdudef_for_doctor_and_start(self) -> None:
+        paths = SimpleNamespace(
+            recipe_config=Path("/tmp/recipe-config"),
+            recipe_root=Path("/tmp/recipe-root"),
+        )
+        with (
+            mock.patch.object(
+                recipe, "_BASE_WRITE_LAUNCHER", return_value=Path("/tmp/launcher.json")
+            ),
+            mock.patch.object(recipe.show_runtime, "extend_asset_pdudef") as extend,
+            mock.patch.object(
+                recipe.base,
+                "bridge_config_root",
+                return_value=Path("/tmp/base-bridge"),
+            ),
+            mock.patch.object(
+                recipe.show_runtime,
+                "materialize_bridge_config",
+                return_value=Path("/tmp/bridge"),
+            ),
+            mock.patch.object(recipe.show_runtime, "materialize_browser"),
+            mock.patch.object(
+                recipe.show_runtime,
+                "patch_launcher",
+                return_value=Path("/tmp/launcher.json"),
+            ),
+        ):
+            result = recipe._write_show_launcher(
+                paths,
+                Path("/tmp/drone"),
+                Path("/tmp/viewer"),
+                SimpleNamespace(visualization=True),
+                "test-system",
+            )
+        self.assertEqual(result, Path("/tmp/launcher.json"))
+        extend.assert_called_once_with(
+            Path("/tmp/recipe-config/pdudef/drone-pdudef-current.json")
+        )
 
 
 if __name__ == "__main__":

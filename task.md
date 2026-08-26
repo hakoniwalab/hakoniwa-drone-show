@@ -133,19 +133,26 @@ Formation authoring、Transition planning、256機対応などの新機能はTas
 
 ### 要件
 
-- [ ] Launcher起動とショー実行開始を分離する
-- [ ] 本リポジトリにShow Experience Runnerを新規追加する
-- [ ] Drone PROの`AssetShowStateMachine`を継承し、機体制御を複製しない
-- [ ] `--wait-for-show-start`を指定した場合だけ開始待機を有効にする
-- [ ] Launcher起動後、Drone Service、VSP、WebBridge、HTTP serverを準備する
-- [ ] ショー実行系は開始指示を受けるまで待機する
-- [ ] ページ表示時にWebSocketへ自動接続する
-- [ ] 既存の`Connect`ボタンを廃止する
-- [ ] 接続完了後に`ドローンショー開始`ボタンを有効化する
-- [ ] 接続中、開始待ち、実行中、完了、失敗を画面上で区別する
-- [ ] 開始要求の二重送信とショーの二重起動を防止する
-- [ ] 再読み込みしたブラウザが現在の実行状態を復元できるようにする
-- [ ] Launcherの`stop`で待機中・実行中のprocessを終了できる
+- [x] Launcher起動とショー実行開始を分離する
+- [x] 本リポジトリにShow Experience Runnerを新規追加する
+- [x] Drone PROの`AssetShowStateMachine`を継承し、機体制御を複製しない
+- [x] `--wait-for-show-start`を指定した場合だけ開始待機を有効にする
+- [x] Launcher起動後、Drone Service、VSP、WebBridge、HTTP serverを準備する
+- [x] ショー実行系は開始指示を受けるまで待機する
+- [x] 待機中も各loopで`hakopy.usleep()`を呼び、箱庭時刻を停止させない
+- [x] command/statusを別の1024 byte raw PDU channelとして定義する
+- [x] 既存WebBridgeの同一WebSocket portで双方向転送する
+- [x] ページ表示時にWebSocketへ自動接続する
+- [x] ショー専用HTMLを追加し、既存Viewer画面の`Connect` UIへ依存しない
+- [x] Show Runnerが`waiting`かつ全機表示後に`ドローンショー開始`ボタンを有効化する
+- [x] 接続中、初期化中、開始待ち、実行中、完了、失敗を画面上で区別する
+- [x] `run_id`、show hash、sequenceで開始要求の二重送信と二重起動を防止する
+- [x] Status heartbeatから、再読み込みしたブラウザが現在の実行状態を復元できるようにする
+- [x] Launcherの`stop`対象である既存show-runner assetだけを差し替える
+- [x] 全機の初期位置から一度だけ第三者カメラを構成し、離陸前の機体群を見渡せるようにする
+- [x] カメラ構成後は飛行へ追従せず、先行したユーザーのカメラ操作も上書きしない
+
+通信仕様は[`docs/show-control-protocol.md`](docs/show-control-protocol.md)を正本とする。
 
 ### Acceptance Test
 
@@ -246,18 +253,18 @@ Formation authoring、Transition planning、256機対応などの新機能はTas
 
 ### 要件
 
-- [ ] Show Experience Runnerを本リポジトリのPython packageへ追加する
-- [ ] 既存のPerformance Runnerと同様に、Drone PROのShow Runner moduleを動的に読み込む
-- [ ] `AssetShowStateMachine`を継承し、既存のphase進行と機体制御をそのまま利用する
-- [ ] `--publish-show-status`を指定した場合だけStatus PDUを発行する
-- [ ] 既存bindingの`std_msgs/String`を使用し、新しいIDLを追加しない
-- [ ] Show Statusはショー全体で1チャンネルとし、機体ごとのPDUを追加しない
+- [x] Show Experience Runnerを本リポジトリのPython packageへ追加する
+- [x] 既存のPerformance Runnerと同様に、Drone PROのShow Runner moduleを動的に読み込む
+- [x] `AssetShowStateMachine`を継承し、既存のphase進行と機体制御をそのまま利用する
+- [ ] Task 1の最小Statusをphase情報付きStatusへ拡張する
+- [x] 新しいIDLを追加せず、1024 byte固定長raw PDU内でUTF-8 JSONを転送する
+- [x] Show Statusはショー全体で1チャンネルとし、機体ごとのPDUを追加しない
 - [ ] `schema_version`、`show_sha256`、`run_id`、`state`、`phase_index`、`phase_kind`、`show_elapsed_sec`、`phase_elapsed_sec`、`simulation_time_usec`、`sequence`を定義する
-- [ ] `waiting`、`running`、`completed`、`failed`の状態を通知する
+- [x] `initializing`、`waiting`、`running`、`completed`、`failed`の最小状態を通知する
 - [ ] phase開始・完了時に即時通知し、実行中は既定1Hzのheartbeatを通知する
-- [ ] `--show-status-heartbeat-hz`でheartbeat周期を変更できるようにする
-- [ ] 起動時に新しい`run_id`と`waiting`状態を書き、前回実行の状態を無効化する
-- [ ] WebBridgeでShow Statusの1チャンネルだけをViewerへ転送する
+- [x] `--show-status-heartbeat-hz`でheartbeat周期を変更できるようにする
+- [x] 起動時に新しい`run_id`を書き、前回実行のcommand/statusを無効化する
+- [x] WebBridgeでShow Statusの1チャンネルだけをViewerへ転送する
 - [ ] Viewerが`show_sha256`をresolved show planと照合し、不一致を拒否する
 - [ ] Status PDUを無効化した場合は、従来のShow Runnerと同じ挙動を維持する
 
