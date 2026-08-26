@@ -1,5 +1,4 @@
 import { ShowControlClient } from './show-control-client.mjs';
-import { computeInitialFleetCamera } from './fleet-camera.mjs';
 
 const ui = {
   state: document.getElementById('show-state'),
@@ -14,8 +13,6 @@ let latestStatus = null;
 let expectedDroneCount = 0;
 let visibleDroneCount = 0;
 let startPending = false;
-let cameraFramed = false;
-let cameraTouched = false;
 const markers = new Map();
 
 function setUiState(state, detail = '') {
@@ -91,10 +88,6 @@ async function initialize() {
   viewer.configure(config);
   await viewer.initialize({ droneConfigPath: config.three.sceneConfigPath });
   viewer.setNightMode(true);
-  const threeRoot = document.getElementById('three-root');
-  for (const eventName of ['pointerdown', 'wheel', 'touchstart']) {
-    threeRoot?.addEventListener(eventName, () => { cameraTouched = true; }, { passive: true });
-  }
 
   let connected = false;
   while (!connected) {
@@ -125,15 +118,6 @@ async function initialize() {
     visibleDroneCount = drones.filter((drone) => drone.latestPose).length;
     ui.droneCount.textContent = `${visibleDroneCount} / ${expectedDroneCount}`;
     refreshStartButton();
-    if (!cameraFramed && !cameraTouched && visibleDroneCount >= expectedDroneCount) {
-      const camera = computeInitialFleetCamera(drones);
-      if (camera) {
-        cameraFramed = viewer.setMainCameraPoseRos(
-          camera.positionRos,
-          camera.targetRos,
-        );
-      }
-    }
     const radius = fleetMarkerSize(expectedDroneCount);
     for (const drone of drones) {
       if (!drone.latestPose) continue;
