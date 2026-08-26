@@ -1,0 +1,79 @@
+# Show File v1
+
+Show Fileは、機体数に依存しないドローンショーのユーザインタフェースです。使用する
+SVG Formation、実行順、移動時間、待機時間、LEDを1つのJSONに記述します。
+Formation JSON、Resolved Show Plan、Show IRを直接編集させないためのファサードであり、
+ショー制作におけるユーザ入力の正本です。
+
+既定の例は`shows/three-face.show.json`です。
+
+```json
+{
+  "schema_version": "1.0",
+  "show_id": "three-face-show",
+  "title": "Three Face Show",
+  "assignment": { "strategy": "index" },
+  "formations": [
+    {
+      "formation_id": "round-ear-face",
+      "title": "Round-ear face",
+      "svg": "../assets/formations/round-ear-face.svg"
+    }
+  ],
+  "timeline": [
+    {
+      "step_id": "face-1",
+      "formation_id": "round-ear-face",
+      "transition_sec": 6.0,
+      "hold_sec": 10.0,
+      "led": {
+        "effect": "steady",
+        "rgb": [255, 64, 96],
+        "brightness": 1.0
+      }
+    }
+  ]
+}
+```
+
+`formations[].svg`はShow Fileからの相対パスです。`timeline`では同じ
+Formationを複数回参照できます。現在のLED effectは`steady`のみです。
+
+## 機体数との関係
+
+Show FileとSVGには機体数を書きません。`configure`はexperimentの
+`scale.drone_count`を読み、各SVGをその点数へ再サンプリングして、機体数入りの
+Formation JSON、Show Plan、Show IRを生成します。
+
+```text
+Show File + SVG             機体数非依存（編集する正本）
+            + scale.drone_count
+                    ↓ configure
+Formation / Show Plan / IR  機体数依存（自動生成物）
+```
+
+したがって、同じShow Fileを128機、180機などで再利用できます。ただし、実行可能な
+機体数は使用中の箱庭コア/Drone PROプロファイルの上限に従います。また、点数が少ないほど
+SVGの細部は粗くなります。
+
+## 切り替え手順
+
+1. 既存ファイルをコピーし、`formations`と`timeline`を編集する。
+2. experimentの`scenario.show_file`を新しいファイルへ変更する。
+3. Launcherを正規終了し、`configure`を再実行する。
+
+```bash
+python3 tools/show_file.py shows/my-show.show.json
+python3 tools/recipe/virtual_drone_show.py stop
+python3 tools/recipe/virtual_drone_show.py configure \
+  --mujoco-city-world <city-world-receipt.json> \
+  --altitude-mode route-clearance
+```
+
+JSON Schemaの正本は`schemas/show-file-v1.schema.json`です。
+
+## 従来の`scenario/show.json`との違い
+
+Drone PROの従来Runnerが読む`scenario/show.json`は、汎用Business Packとの互換性を保つ
+ための内部形式です。本書のShow Fileとは別の概念です。新しいショーではShow Fileを編集し、
+`configure`が生成したShow IRをShow Experience Runnerへ渡します。

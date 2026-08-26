@@ -10,8 +10,9 @@ from pathlib import Path
 from typing import Any
 
 from tools import show_control_protocol as protocol
-from tools.generate_demo_formations import demo_formations, generate_demo
 from tools.show_compiler import compile_show
+from tools.show_file import ShowFileError, load_show_file
+from tools.svg_to_formation import SvgConversionError, convert_svg
 
 
 SHOW_PDUTYPES_ID = "drone_show_control_type"
@@ -132,36 +133,56 @@ def _materialize_show_ir(*, recipe_config: Path, marker: dict[str, Any]) -> Path
     if actual_ids != expected_ids:
         raise ShowRuntimeError("runtime Show IR currently requires Drone-1..N fleet IDs")
 
+    show_config = marker.get("drone_show")
+    if not isinstance(show_config, dict):
+        raise ShowRuntimeError("City marker has no drone_show configuration")
+    definition_reference = show_config.get("show_definition")
+    if not isinstance(definition_reference, dict):
+        raise ShowRuntimeError("City marker has no Show File reference")
+    definition_path = Path(str(definition_reference.get("path", ""))).resolve()
+    expected_definition_sha256 = definition_reference.get("sha256")
+    if not definition_path.is_file():
+        raise ShowRuntimeError(f"Show File not found: {definition_path}")
+    if _sha256(definition_path) != expected_definition_sha256:
+        raise ShowRuntimeError(
+            "Show File changed after configure input was resolved; "
+            "run configure again"
+        )
+    try:
+        definition = load_show_file(definition_path)
+    except ShowFileError as exc:
+        raise ShowRuntimeError(str(exc)) from exc
+
     output_root = recipe_config / "scenario" / "show-ir"
     formation_root = output_root / "formations"
     formation_root.mkdir(parents=True, exist_ok=True)
     formation_references = []
-    for specification in demo_formations():
-        formation = generate_demo(
-            specification,
-            input_directory=(
-                Path(__file__).resolve().parents[2] / "assets" / "formations"
-            ),
-            point_count=drone_count,
-        )
-        formation_path = formation_root / f"{formation['formation_id']}.json"
+    resolved_formation_ids: dict[str, str] = {}
+    for specification in definition["formations"]:
+        source_path = (definition_path.parent / specification["svg"]).resolve()
+        if not source_path.is_file():
+            raise ShowRuntimeError(f"Formation SVG not found: {source_path}")
+        resolved_id = f"{specification['formation_id']}-{drone_count}"
+        try:
+            formation = convert_svg(
+                source_path,
+                formation_id=resolved_id,
+                point_count=drone_count,
+                title=f"{specification['title']} ({drone_count} points)",
+                source_uri=specification["svg"],
+            )
+        except SvgConversionError as exc:
+            raise ShowRuntimeError(str(exc)) from exc
+        resolved_formation_ids[specification["formation_id"]] = resolved_id
+        formation_path = formation_root / f"{resolved_id}.json"
         _write_json(formation_path, formation)
         formation_references.append(
             {
-                "formation_id": formation["formation_id"],
+                "formation_id": resolved_id,
                 "path": f"formations/{formation_path.name}",
                 "sha256": _sha256(formation_path),
             }
         )
-
-    legacy_show_path = recipe_config / "scenario" / "show.json"
-    legacy_show = _read_json(legacy_show_path)
-    legacy_timeline = legacy_show.get("timeline")
-    if not isinstance(legacy_timeline, list) or len(legacy_timeline) != 3:
-        raise ShowRuntimeError("City show must provide three legacy timing steps")
-    show_config = marker.get("drone_show")
-    if not isinstance(show_config, dict):
-        raise ShowRuntimeError("City marker has no drone_show configuration")
     scale_m = float(show_config["formation_scale_m"])
     if not scale_m > 0:
         raise ShowRuntimeError("drone_show.formation_scale_m must be positive")
@@ -193,45 +214,20 @@ def _materialize_show_ir(*, recipe_config: Path, marker: dict[str, Any]) -> Path
         "tilt_deg": tilt_deg,
     }
     timeline = []
-    led_overrides = (
-        {
-            "default": {
-                "effect": "steady",
-                "rgb": [255, 64, 96],
-                "brightness": 1.0,
-            }
-        },
-        {
-            "default": {
-                "effect": "steady",
-                "rgb": [64, 255, 128],
-                "brightness": 1.0,
-            }
-        },
-        {
-            "default": {
-                "effect": "steady",
-                "rgb": [255, 220, 48],
-                "brightness": 1.0,
-            }
-        },
-    )
-    for index, (reference, timing, led) in enumerate(
-        zip(formation_references, legacy_timeline, led_overrides), start=1
-    ):
+    for source_step in definition["timeline"]:
         step = {
-            "step_id": f"face-{index}",
-            "formation_id": reference["formation_id"],
-            "transition_sec": float(timing["duration_sec"]),
-            "hold_sec": float(timing.get("hold_sec", 0.0)),
+            "step_id": source_step["step_id"],
+            "formation_id": resolved_formation_ids[source_step["formation_id"]],
+            "transition_sec": source_step["transition_sec"],
+            "hold_sec": source_step["hold_sec"],
+            "led": {"default": source_step["led"]},
         }
-        if led is not None:
-            step["led"] = led
         timeline.append(step)
+    first_step = definition["timeline"][0]
     plan = {
         "schema_version": "0.1",
-        "show_id": f"city-three-face-{drone_count}",
-        "title": f"City three-face drone show ({drone_count} drones)",
+        "show_id": f"{definition['show_id']}-{drone_count}",
+        "title": f"{definition['title']} ({drone_count} drones)",
         "time_unit": "second",
         "fleet": {
             "drone_count": drone_count,
@@ -240,12 +236,12 @@ def _materialize_show_ir(*, recipe_config: Path, marker: dict[str, Any]) -> Path
                 "start": 1,
                 "zero_padding": 0,
             },
-            "assignment": {"strategy": "index"},
+            "assignment": definition["assignment"],
         },
         "formations": formation_references,
         "defaults": {
-            "transition_sec": float(legacy_timeline[0]["duration_sec"]),
-            "hold_sec": float(legacy_timeline[0].get("hold_sec", 0.0)),
+            "transition_sec": first_step["transition_sec"],
+            "hold_sec": first_step["hold_sec"],
             "transform": transform,
             "led": {
                 "default": {

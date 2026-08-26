@@ -1,0 +1,60 @@
+{
+  "schema_version": "1.0",
+  "show_id": "three-face-show",
+  "title": "Three Face Show",
+  "assignment": {
+    "strategy": "index"
+  },
+  "formations": [
+    {
+      "formation_id": "round-ear-face",
+      "title": "Round-ear face",
+      "svg": "../assets/formations/round-ear-face.svg"
+    },
+    {
+      "formation_id": "cat-ear-face",
+      "title": "Cat-ear face",
+      "svg": "../assets/formations/cat-ear-face.svg"
+    },
+    {
+      "formation_id": "long-ear-face",
+      "title": "Long-ear face",
+      "svg": "../assets/formations/long-ear-face.svg"
+    }
+  ],
+  "timeline": [
+    {
+      "step_id": "face-1",
+      "formation_id": "round-ear-face",
+      "transition_sec": 6.0,
+      "hold_sec": 10.0,
+      "led": {
+        "effect": "steady",
+        "rgb": [255, 64, 96],
+        "brightness": 1.0
+      }
+    },
+    {
+      "step_id": "face-2",
+      "formation_id": "cat-ear-face",
+      "transition_sec": 6.0,
+      "hold_sec": 10.0,
+      "led": {
+        "effect": "steady",
+        "rgb": [64, 255, 128],
+        "brightness": 1.0
+      }
+    },
+    {
+      "step_id": "face-3",
+      "formation_id": "long-ear-face",
+      "transition_sec": 6.0,
+      "hold_sec": 10.0,
+      "led": {
+        "effect": "steady",
+        "rgb": [255, 220, 48],
+        "brightness": 1.0
+      }
+    }
+  ]
+}

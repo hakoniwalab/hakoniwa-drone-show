@@ -135,11 +135,61 @@ Task 1対応Recipeでは、`start`しても自動的に離陸しません。`ope
 順番に表示します。LED指定を行わない既存Viewerでは、従来の水色breathing表示がそのまま
 fallbackとして使われます。
 
+## ショーを作るために用意するファイル
+
+ユーザが用意・編集する入力は、次の3種類です。生成されたFormation JSON、Resolved
+Show Plan、Show IRを直接編集する必要はありません。
+
+1. **SVGファイル** — 各Formationの原画です。機体数は指定しません。
+2. **Show File（`*.show.json`）** — 使用するSVG、Formationの実行順、移動時間、待機時間、LEDを定義します。
+3. **City experiment YAML** — 機体数、プロセス数、Show Fileへの参照、Formationの大きさ・傾斜、高度、最大速度、Viewer設定を定義します。
+
+既定の入力は次のファイルです。
+
+- SVG: [`assets/formations/`](assets/formations/)
+- Show File: [`shows/three-face.show.json`](shows/three-face.show.json)
+- City experiment: [`recipes/experiments/virtual-drone-show-city.yaml`](recipes/experiments/virtual-drone-show-city.yaml)
+
+`configure`は`scale.drone_count`を使い、入力から実行用成果物までを自動生成します。
+
+```text
+SVG + Show File + City experiment YAML
+                    ↓ configure
+機体数分のFormation JSON
+                    ↓
+Resolved Show Plan
+                    ↓
+Show IR
+                    ↓
+Fleet設定・Launcher・Viewer設定
+```
+
+SVGとShow Fileは機体数非依存です。Formation JSON、Resolved Show Plan、Show IRは
+機体数依存の自動生成物です。機体数を変更した場合は`configure`を再実行してください。
+各SVGは新しい機体数へ再サンプリングされ、後続成果物も作り直されます。実行可能な
+最大機体数は、使用する箱庭コアおよびDrone PROプロファイルの上限に従います。
+
+Show Fileの形式と新しいショーへの切り替え手順は
+[`docs/show-file-v1.md`](docs/show-file-v1.md)を参照してください。
+
 ## Show toolchain v0.1
 
-Formation JSONはSVG等から生成する再利用可能な正規化点群、Show IRは機体割当・時刻・
-位置・LED状態が確定済みの実行・検証フォーマットです。Show Planは両者の間でFormation
-の順序、移動・待機時間、配置、LED演出を記述します。
+Show toolchainは、次の4つの概念を扱います。
+
+| 概念 | 編集者 | 機体数依存 | 責務 |
+|---|---|---|---|
+| **Show File（`*.show.json`）** | ユーザ | なし | SVG参照、Formationの実行順、移動・待機時間、LEDをまとめるユーザインタフェースです。 |
+| **Formation JSON** | ツール | あり | SVG等から指定機体数で生成する、再利用可能な正規化点群です。 |
+| **Resolved Show Plan** | ツール | あり | Formation参照、機体数、配置、時間、LEDを解決した中間計画です。 |
+| **Show IR** | ツール | あり | 機体割当・時刻・位置・LED状態が確定済みの実行・検証フォーマットです。これだけ読めばショーを実行できます。 |
+
+Show Fileは、Formation、Show Plan、Show IRを直接編集させないためのファサードであり、
+ショー制作におけるユーザ入力の正本です。
+
+なお、Drone PROの従来Runnerが読む互換用`scenario/show.json`はShow Fileではありません。
+本RecipeはShow IR経路を使用し、互換用`scenario/show.json`は汎用Business Packの内部生成物
+として扱います。ユーザが新しいショーを作る場合は、`shows/*.show.json`相当のShow Fileを
+編集してください。
 
 - [`docs/formation-v0.1.md`](docs/formation-v0.1.md)
 - [`schemas/formation-v0.1.schema.json`](schemas/formation-v0.1.schema.json)
@@ -159,11 +209,16 @@ Formation JSONはSVG等から生成する再利用可能な正規化点群、Sho
 - [`examples/show-ir/minimal.json`](examples/show-ir/minimal.json)
 - [`docs/toolchain-guide.md`](docs/toolchain-guide.md)
 
+City Showで使用するFormation、実行順、時間、LEDは、機体数非依存のShow File
+[`shows/three-face.show.json`](shows/three-face.show.json)で切り替えられます。形式と
+変更手順は[`docs/show-file-v1.md`](docs/show-file-v1.md)を参照してください。
+
 箱庭、Drone PRO、Viewerを起動せず、標準Pythonだけで検証できます。
 
 ```bash
 python3 tools/formation.py validate examples/formations/diamond-4.json
 python3 tools/generate_demo_formations.py
+python3 tools/show_file.py shows/three-face.show.json
 python3 tools/svg_to_formation.py assets/formations/round-ear-face.svg \
   --formation-id round-ear-face-128 --points 128 \
   --output /tmp/round-ear-face-128.json

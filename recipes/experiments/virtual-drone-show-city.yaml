@@ -25,12 +25,11 @@ viewer:
     fov_deg: 55.0
 
 scenario:
+  show_file: ../../shows/three-face.show.json
   formation:
     scale_m: 20
     audience_tilt_deg: -60.0
   altitude_m: 10.0
-  duration_sec: 6.0
-  hold_sec: 10.0
   max_speed_m_s: 20.0
   timeout_sec: 120.0
   land: false

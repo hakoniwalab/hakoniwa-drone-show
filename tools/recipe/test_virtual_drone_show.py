@@ -21,13 +21,51 @@ sys.modules[SPEC.name] = recipe
 SPEC.loader.exec_module(recipe)
 
 
+def write_show_definition(root: Path) -> Path:
+    path = root / "show.json"
+    svg = root / "face.svg"
+    svg.write_bytes(
+        (
+            recipe.SHOW_ROOT / "assets" / "formations" / "round-ear-face.svg"
+        ).read_bytes()
+    )
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": "1.0",
+                "show_id": "test-show",
+                "formations": [
+                    {
+                        "formation_id": "face",
+                        "svg": svg.name,
+                    }
+                ],
+                "timeline": [
+                    {
+                        "step_id": "face",
+                        "formation_id": "face",
+                        "transition_sec": 7.0,
+                        "hold_sec": 4.0,
+                        "led": {"rgb": [255, 255, 255], "brightness": 1.0},
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    return path
+
+
 class VirtualDroneShowTest(unittest.TestCase):
     def test_show_formation_scale_is_adapted_for_base_recipe(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
-            experiment = Path(temporary) / "experiment.yaml"
+            root = Path(temporary)
+            write_show_definition(root)
+            experiment = root / "experiment.yaml"
             experiment.write_text(
                 """version: 1
 scenario:
+  show_file: show.json
   formation:
     scale_m: 61.325
   max_speed_m_s: 20.0
@@ -47,12 +85,17 @@ scenario:
             self.assertEqual(compatible["scenario"]["letter_height_m"], 20.0)
             self.assertEqual(compatible["scenario"]["letter_gap_m"], 4.5)
             self.assertEqual(compatible["scenario"]["speed_m_s"], 20.0)
+            self.assertEqual(compatible["scenario"]["duration_sec"], 7.0)
+            self.assertEqual(compatible["scenario"]["hold_sec"], 4.0)
 
     def test_show_formation_scale_rejects_legacy_dimensions(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
-            experiment = Path(temporary) / "experiment.yaml"
+            root = Path(temporary)
+            write_show_definition(root)
+            experiment = root / "experiment.yaml"
             experiment.write_text(
                 """scenario:
+  show_file: show.json
   formation:
     scale_m: 15.0
   max_speed_m_s: 20.0
@@ -292,6 +335,20 @@ scenario:
                     return_value={"initial_mode": "free"},
                 ),
                 mock.patch.object(
+                    recipe,
+                    "_show_definition",
+                    return_value=(
+                        recipe.SHOW_ROOT / "shows" / "three-face.show.json",
+                        {
+                            "timeline": [
+                                {"step_id": "face-1"},
+                                {"step_id": "face-2"},
+                                {"step_id": "face-3"},
+                            ]
+                        },
+                    ),
+                ),
+                mock.patch.object(
                     recipe.base, "resolve_experiment", return_value=experiment
                 ),
                 mock.patch.object(
@@ -342,6 +399,18 @@ scenario:
                     "formation_scale_m": 15.0,
                     "max_speed_m_s": 20.0,
                     "viewer": {"initial_mode": "free"},
+                    "show_definition": {
+                        "path": str(
+                            recipe.SHOW_ROOT / "shows" / "three-face.show.json"
+                        ),
+                        "sha256": recipe.hashlib.sha256(
+                            (
+                                recipe.SHOW_ROOT
+                                / "shows"
+                                / "three-face.show.json"
+                            ).read_bytes()
+                        ).hexdigest(),
+                    },
                 },
             )
             extend_pdudef.assert_called_once_with(

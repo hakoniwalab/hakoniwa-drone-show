@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import hashlib
 import importlib.util
 import json
 import math
@@ -60,6 +61,7 @@ city = _load_module(
     Path(__file__).with_name("drone_fleet_mujoco_city.py"),
 )
 from tools.recipe import show_runtime
+from tools.show_file import ShowFileError, load_show_file
 
 base.OPERATOR_COMMAND = "python ../hakoniwa-drone-show/tools/recipe/virtual_drone_show.py"
 base.MAP_VIEWER_URL_BASE = (
@@ -82,8 +84,29 @@ _LEGACY_BASE_WORD_DIMENSIONS = {
 _INTERNAL_COMPATIBILITY_FIELDS = (
     set(_BASE_SCENARIO_COMPATIBILITY)
     | set(_LEGACY_BASE_WORD_DIMENSIONS)
-    | {"speed_m_s"}
+    | {"speed_m_s", "duration_sec", "hold_sec"}
 )
+
+
+def _show_definition(experiment_path: Path) -> tuple[Path, dict]:
+    raw = _BASE_LOAD_SIMPLE_YAML(experiment_path)
+    scenario = raw.get("scenario")
+    value = scenario.get("show_file") if isinstance(scenario, dict) else None
+    if not isinstance(value, str) or not value.strip():
+        raise base.RecipeError("scenario.show_file must be a non-empty relative path")
+    candidate = Path(value)
+    if candidate.is_absolute():
+        raise base.RecipeError("scenario.show_file must be relative to the experiment")
+    path = (experiment_path.resolve().parent / candidate).resolve()
+    try:
+        definition = load_show_file(path)
+    except ShowFileError as exc:
+        raise base.RecipeError(str(exc)) from exc
+    for formation in definition["formations"]:
+        svg_path = (path.parent / formation["svg"]).resolve()
+        if not svg_path.is_file():
+            raise base.RecipeError(f"Formation SVG not found: {svg_path}")
+    return path, definition
 
 
 def _formation_scale_m(
@@ -263,6 +286,7 @@ def _load_base_compatible_experiment(path: Path):
     formation_scale_m = _formation_scale_m(path)
     _formation_audience_tilt_deg(path)
     maximum_speed_m_s = _max_speed_m_s(path)
+    _, show_definition = _show_definition(path)
     compatibility_fields = sorted(
         set(scenario) & _INTERNAL_COMPATIBILITY_FIELDS
     )
@@ -276,6 +300,7 @@ def _load_base_compatible_experiment(path: Path):
     compatible_scenario = compatible["scenario"]
     del compatible_scenario["formation"]
     del compatible_scenario["max_speed_m_s"]
+    del compatible_scenario["show_file"]
     compatible_scenario.update(_BASE_SCENARIO_COMPATIBILITY)
     compatibility_scale = formation_scale_m / _LEGACY_BASE_FORMATION_SCALE_M
     compatible_scenario.update(
@@ -287,6 +312,11 @@ def _load_base_compatible_experiment(path: Path):
     # The generic Recipe requires speed_m_s. In Show IR mode this value is
     # forwarded as a maximum speed constraint, not as an independent timeline.
     compatible_scenario["speed_m_s"] = maximum_speed_m_s
+    first_step = show_definition["timeline"][0]
+    # The generic City Recipe still requires a three-phase compatibility
+    # scenario. Runtime timing is owned by the external Show File.
+    compatible_scenario["duration_sec"] = first_step["transition_sec"]
+    compatible_scenario["hold_sec"] = first_step["hold_sec"]
     return compatible
 
 
@@ -472,6 +502,7 @@ def configure(args: argparse.Namespace, experiment_path: Path, drone_root: Path)
     formation_audience_tilt_deg = _formation_audience_tilt_deg(
         experiment_path, override=args.formation_tilt_deg
     )
+    show_definition_path, show_definition = _show_definition(experiment_path)
     viewer_settings = _viewer_settings(experiment_path)
     rc = base.configure(
         experiment_path,
@@ -505,6 +536,10 @@ def configure(args: argparse.Namespace, experiment_path: Path, drone_root: Path)
         "formation_scale_m": formation_scale_m,
         "max_speed_m_s": experiment.speed_m_s,
         "viewer": viewer_settings,
+        "show_definition": {
+            "path": str(show_definition_path),
+            "sha256": hashlib.sha256(show_definition_path.read_bytes()).hexdigest(),
+        },
     }
     (paths.recipe_config / "mujoco-city-fleet.json").write_text(
         json.dumps(marker, indent=2) + "\n", encoding="utf-8"
@@ -524,7 +559,6 @@ def configure(args: argparse.Namespace, experiment_path: Path, drone_root: Path)
     launcher = paths.recipe_config / "launcher.json"
     launcher.unlink(missing_ok=True)
     plan = marker["flight_plan"]
-    phases = plan.get("show_phases", ["HAKONIWA"])
     print("Virtual drone show extension configured")
     print(f"City World             : {city_world}")
     print(f"Drone PRO              : {drone_root}")
@@ -532,12 +566,20 @@ def configure(args: argparse.Namespace, experiment_path: Path, drone_root: Path)
     print(f"Formation scale        : {formation_scale_m:g} m")
     print(f"Formation audience tilt: {formation_audience_tilt_deg:g} deg")
     print(
+        "Show File             : "
+        f"{show_definition_path} ({len(show_definition['timeline'])} steps)"
+    )
+    print(
         "Show speed             : "
         f"required {required_speed_m_s:.3f} m/s / "
         f"maximum {experiment.speed_m_s:g} m/s"
     )
     print(f"Show IR                : {show_ir_path}")
-    print("Scenario               : takeoff -> " + " -> ".join(phases) + " -> final hold")
+    print(
+        "Scenario               : takeoff -> "
+        + " -> ".join(step["step_id"] for step in show_definition["timeline"])
+        + " -> final hold"
+    )
     print(
         "Flight altitude        : "
         f"{plan['resolved_flight_altitude_m']:.3f} m local Z"

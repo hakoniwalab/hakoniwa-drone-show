@@ -180,6 +180,8 @@ Formation authoring、Transition planning、256機対応などの新機能はTas
 - [x] Formation、割当、移動時間、hold時間からShow IRをcompileする
 - [x] 現在の3 FormationショーをShow IRから再現する
 - [x] Recipeが実Fleet初期位置と指定機数のFormationからruntime Show IRを自動生成する
+- [x] 機体数非依存のShow FileでSVG、実行順、時間、LEDを切り替えられる
+- [x] configure時に各SVGを`scale.drone_count`点へ再サンプリングする
 - [x] Show Experience RunnerへoptionalなShow IR adapterを追加する
 - [x] Show IR未指定時はDrone PROの従来`show.json`経路を維持する
 - [ ] MuJoCo実行でCityデモの3 Formation、6秒移動、10秒holdをAcceptance確認する
@@ -242,7 +244,7 @@ Formation authoring、Transition planning、256機対応などの新機能はTas
 
 ### 要件
 
-- [ ] 既存の`formation`、`duration_sec`、`hold_sec`との互換性を維持する
+- [x] Drone PROの既存`show.json`経路を維持し、Show側の時間設定は外部定義へ移す
 - [ ] LED色をRGBまたは`#RRGGBB`で指定できるようにする
 - [ ] LED明るさを指定できるようにする
 - [ ] `steady`、`blink`、`fade`を初期対応の点灯効果とする

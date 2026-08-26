@@ -91,12 +91,11 @@ ENU各軸のaxis-aligned bounding boxは、回転によってこの値より小�
 
 | 項目 | 型・制約 | 説明 |
 |---|---|---|
+| `scenario.show_file` | experimentからの相対パス | 機体数非依存のShow Fileです。SVG一覧、実行順、移動・待機時間、LEDを定義します。詳細は[Show File v1](show-file-v1.md)を参照してください。 |
 | `scenario.formation.scale_m` | 0より大きい数値 | 全Formationの公称最大寸法（m）です。顔の大きさを直接調整する項目です。詳細は「Formationの大きさ」を参照してください。 |
 | `scenario.formation.audience_tilt_deg` | -85〜85の数値 | Formation平面を水平面から起こす角度（度）です。0度は上空から見やすい水平、絶対値が90度に近いほど地上の観客へ正対し、符号で傾斜方向が反転します。現在は反対方向を確認できるよう`-60`度に設定しています。`configure --formation-tilt-deg`で一時上書きできます。 |
 | `scenario.altitude_m` | 0.5以上の数値 | City飛行計画が要求する最低クリアランス（m）の既定値です。最終高度はCity colliderと`configure`時の`--altitude-mode`、`--above-city-clearance-m`等から解決され、生成markerとShow IRへ記録されます。 |
-| `scenario.duration_sec` | 0より大きい数値 | 各顔Formationへの移動に割り当てる時間（秒）です。Show Planの各stepの`transition_sec`になります。 |
-| `scenario.hold_sec` | 0以上の数値 | 各顔Formationを到達後に維持する時間（秒）です。Show Planの各stepの`hold_sec`になります。 |
-| `scenario.max_speed_m_s` | 0より大きい数値 | 機体へ許可する最大移動速度（m/s）です。実際の指令速度は各機体の移動距離を`duration_sec`で割って求めます。configureは必要最大速度がこの値を超える計画をエラーにし、runtimeにも同じ上限を安全策として渡します。値を大きくしても`duration_sec`より早く到着する設定にはなりません。 |
+| `scenario.max_speed_m_s` | 0より大きい数値 | 機体へ許可する最大移動速度（m/s）です。実際の指令速度は各機体の移動距離をShow Fileの`transition_sec`で割って求めます。configureは必要最大速度がこの値を超える計画をエラーにし、runtimeにも同じ上限を安全策として渡します。値を大きくしても計画時刻より早く到着する設定にはなりません。 |
 | `scenario.timeout_sec` | 1以上の数値 | Fleet命令の完了待ちに使うtimeout（秒）です。遅い移動を設定する場合は必要に応じて増やします。 |
 | `scenario.land` | 真偽値 | `true`ならShow終了後に着陸します。現在のCityデモは`false`で、明示的に`stop`するまで最後のFormationを保持します。 |
 
@@ -105,7 +104,7 @@ ENU各軸のaxis-aligned bounding boxは、回転によってこの値より小�
 例えばYAMLの60度はShow Planの30度、YAMLの-60度はShow Planの-30度になります。
 
 汎用Business Packが内部で要求する`type`、`word`、`letter_width_m`、
-`letter_height_m`、`letter_gap_m`、`speed_m_s`はShow operatorが互換値を補います。これらは
+`letter_height_m`、`letter_gap_m`、`duration_sec`、`hold_sec`、`speed_m_s`はShow operatorが互換値を補います。これらは
 `virtual-drone-show-city.yaml`の公開設定ではなく、指定するとエラーになります。互換用
 FormationもCityの経路クリアランス計算に使われるため、その外形寸法は`scale_m`に
 比例して自動生成されます。
@@ -120,7 +119,7 @@ FormationもCityの経路クリアランス計算に使われるため、その�
 ## 生成物
 
 `configure`はYAMLを解決し、Fleet分割、City flight plan、Show Plan、Show IR、Launcherを
-生成します。次の生成物を直接編集せず、YAMLまたはFormation/Show Planの入力を変更して
+生成します。次の生成物を直接編集せず、experiment、Show File、SVGの入力を変更して
 再度`configure`してください。
 
 - `resolved-experiment.yaml`

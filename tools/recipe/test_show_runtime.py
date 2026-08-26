@@ -9,6 +9,11 @@ from tools import show_control_protocol as protocol
 from tools.recipe import show_runtime
 
 
+SHOW_DEFINITION = (
+    Path(__file__).resolve().parents[2] / "shows" / "three-face.show.json"
+)
+
+
 def write_json(path: Path, value) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(value), encoding="utf-8")
@@ -277,26 +282,6 @@ class ShowRuntimeTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             recipe_config = root / "config"
-            legacy_formation = (
-                recipe_config / "scenario" / "formations" / "legacy.json"
-            )
-            write_json(
-                legacy_formation,
-                {"points": [[-20.0, 0.0, 0.0], [20.0, 0.0, 0.0]]},
-            )
-            write_json(
-                recipe_config / "scenario" / "show.json",
-                {
-                    "formation_files": [
-                        {"id": "legacy", "path": "formations/legacy.json"}
-                    ],
-                    "timeline": [
-                        {"formation": "A", "duration_sec": 8.0, "hold_sec": 6.0},
-                        {"formation": "B", "duration_sec": 8.0, "hold_sec": 6.0},
-                        {"formation": "C", "duration_sec": 8.0, "hold_sec": 6.0},
-                    ],
-                },
-            )
             fleet_path = recipe_config / "drone" / "fleets" / "api-current.json"
             drones = [
                 {
@@ -311,7 +296,13 @@ class ShowRuntimeTest(unittest.TestCase):
                 marker={
                     "drone_count": 32,
                     "fleet_config": str(fleet_path),
-                    "drone_show": {"formation_scale_m": 15.0},
+                    "drone_show": {
+                        "formation_scale_m": 15.0,
+                        "show_definition": {
+                            "path": str(SHOW_DEFINITION),
+                            "sha256": show_runtime._sha256(SHOW_DEFINITION),
+                        },
+                    },
                     "flight_plan": {
                         "resolved_flight_altitude_m": 50.0,
                         "formation_audience_tilt_deg": 60.0,
@@ -322,7 +313,7 @@ class ShowRuntimeTest(unittest.TestCase):
             self.assertEqual(show_ir["drone_ids"], [f"Drone-{i}" for i in range(1, 33)])
             self.assertEqual(
                 [frame["time_sec"] for frame in show_ir["timeline"]],
-                [0.0, 8.0, 14.0, 22.0, 28.0, 36.0, 42.0],
+                [0.0, 6.0, 16.0, 22.0, 32.0, 38.0, 48.0],
             )
             self.assertEqual(
                 show_ir["timeline"][0]["states"][0]["position_m"],
@@ -340,6 +331,94 @@ class ShowRuntimeTest(unittest.TestCase):
             )
             self.assertEqual(plan["defaults"]["transform"]["scale_m"], 15.0)
             self.assertEqual(plan["defaults"]["transform"]["tilt_deg"], 30.0)
+
+    def test_runtime_uses_external_formation_order_and_timing(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            recipe_config = root / "config"
+            fleet_path = recipe_config / "drone" / "fleets" / "api-current.json"
+            write_json(
+                fleet_path,
+                {
+                    "drones": [
+                        {
+                            "name": f"Drone-{index}",
+                            "position_meter": [float(index), 0.0, -1.0],
+                        }
+                        for index in range(1, 33)
+                    ]
+                },
+            )
+            source_svg = (
+                SHOW_DEFINITION.parent.parent
+                / "assets"
+                / "formations"
+                / "round-ear-face.svg"
+            )
+            svg = root / "face.svg"
+            svg.write_bytes(source_svg.read_bytes())
+            definition = root / "custom-show.json"
+            write_json(
+                definition,
+                {
+                    "schema_version": "1.0",
+                    "show_id": "custom-show",
+                    "formations": [
+                        {"formation_id": "alpha", "svg": "face.svg"},
+                        {"formation_id": "beta", "svg": "face.svg"},
+                    ],
+                    "timeline": [
+                        {
+                            "step_id": "first",
+                            "formation_id": "beta",
+                            "transition_sec": 2.0,
+                            "hold_sec": 1.0,
+                            "led": {"rgb": [1, 2, 3], "brightness": 0.5},
+                        },
+                        {
+                            "step_id": "second",
+                            "formation_id": "alpha",
+                            "transition_sec": 3.0,
+                            "hold_sec": 4.0,
+                            "led": {"rgb": [4, 5, 6], "brightness": 1.0},
+                        },
+                    ],
+                },
+            )
+            show_ir_path = show_runtime.materialize_show_ir(
+                recipe_config=recipe_config,
+                marker={
+                    "drone_count": 32,
+                    "fleet_config": str(fleet_path),
+                    "drone_show": {
+                        "formation_scale_m": 10.0,
+                        "show_definition": {
+                            "path": str(definition),
+                            "sha256": show_runtime._sha256(definition),
+                        },
+                    },
+                    "flight_plan": {
+                        "resolved_flight_altitude_m": 5.0,
+                        "formation_audience_tilt_deg": 60.0,
+                    },
+                },
+            )
+            show_ir = json.loads(show_ir_path.read_text(encoding="utf-8"))
+            self.assertEqual(
+                [frame["time_sec"] for frame in show_ir["timeline"]],
+                [0.0, 2.0, 3.0, 6.0, 10.0],
+            )
+            plan = json.loads(
+                (show_ir_path.parent / "show-plan.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(
+                [step["formation_id"] for step in plan["timeline"]],
+                ["beta-32", "alpha-32"],
+            )
+            self.assertEqual(
+                [step["led"]["default"]["rgb"] for step in plan["timeline"]],
+                [[1, 2, 3], [4, 5, 6]],
+            )
 
 
 if __name__ == "__main__":
