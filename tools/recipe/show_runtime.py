@@ -426,6 +426,9 @@ def materialize_browser(
     ] + [{"name": protocol.ROBOT_NAME, "pdutypes_id": SHOW_PDUTYPES_ID}]
     combined_name = "pdudef-drone-show.json"
     _write_json(embedded / "config" / combined_name, visual)
+    viewer_config.setdefault("three", {})["droneAppearance"] = {
+        "bodyColor": "#E8EDF2"
+    }
     viewer_config.setdefault("pdu", {})["pduDefPath"] = f"./{combined_name}"
     _write_json(viewer_config_path, viewer_config)
 

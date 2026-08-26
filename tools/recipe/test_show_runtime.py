@@ -162,6 +162,15 @@ class ShowRuntimeTest(unittest.TestCase):
 
             self.assertEqual((destination / "show-ir.json").read_bytes(), show_ir.read_bytes())
             runtime = json.loads((destination / "runtime-config.json").read_text())
+            viewer = json.loads(
+                (
+                    embedded / "config" / "viewer-config-fleets.json"
+                ).read_text(encoding="utf-8")
+            )
+            self.assertEqual(
+                viewer["three"]["droneAppearance"],
+                {"bodyColor": "#E8EDF2"},
+            )
             self.assertEqual(
                 runtime["led_appearance"], {"scale": 1.45, "intensity": 1.25}
             )
