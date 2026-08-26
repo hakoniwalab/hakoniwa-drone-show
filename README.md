@@ -71,6 +71,9 @@ python3 tools/recipe/virtual_drone_show.py stop
 `configure`はBusiness Packの汎用`drone-fleet-single-host` workspaceへ成果物を
 生成します。以後のコマンドは、そのとき保存されたexperiment、Drone PRO、City World
 およびViewer設定を再利用するため、通常は同じ引数を繰り返す必要がありません。
+Show用PDU、Bridge経路、Web UIも同workspaceの生成物へ追加されます。Drone Show利用後に
+Business Packの汎用Fleet Recipeへ戻る場合は、汎用Recipe側で`configure`を再実行して
+workspaceを再生成してから起動してください。
 
 既定配置を変更する場合は、`HAKONIWA_BUSINESS_PACK_ROOT`環境変数と
 `--drone-root`、`--viewer-root`、`--experiment`を使用します。

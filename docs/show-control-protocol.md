@@ -79,6 +79,11 @@ Task 1ではUI復元に必要な最小状態だけを通知します。
 `failed`だけは1..256文字の`error`を持ちます。状態変化時は即時、同じ状態の間は
 既定1 Hzで更新します。将来のphase情報はTask 4でこのStatusへ追加します。
 
+ブラウザは同じ`run_id`のStatusだけを`sequence`で順序判定します。Runner再起動により
+`run_id`が変わった場合はsequence基準をリセットし、新しい実行のsequence=1から受理します。
+START送信後もRunnerが`waiting`のまま3秒経過した場合は、通信ロストから回復できるよう
+開始ボタンを再度有効化します。Runner側のrun_idとsequence検証により再送は冪等です。
+
 ## 待機と箱庭時刻
 
 Show Experience Runnerはsocketを直接待ち受けません。各manual timing loopでSHMを
@@ -92,4 +97,3 @@ Show Experience Runnerはsocketを直接待ち受けません。各manual timing
 - Runner: `tools/show_experience_runner.py`
 - WebBridge/Launcher生成: `tools/recipe/show_runtime.py`
 - JSON Schema: `schemas/show-control.schema.json`
-

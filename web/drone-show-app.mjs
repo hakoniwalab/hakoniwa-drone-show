@@ -13,7 +13,27 @@ let latestStatus = null;
 let expectedDroneCount = 0;
 let visibleDroneCount = 0;
 let startPending = false;
+let startPendingTimer = null;
 const markers = new Map();
+const START_RETRY_TIMEOUT_MSEC = 3000;
+
+function clearStartPending() {
+  startPending = false;
+  if (startPendingTimer !== null) window.clearTimeout(startPendingTimer);
+  startPendingTimer = null;
+}
+
+function beginStartPending() {
+  clearStartPending();
+  startPending = true;
+  startPendingTimer = window.setTimeout(() => {
+    startPendingTimer = null;
+    if (latestStatus?.state === 'waiting') {
+      startPending = false;
+      refreshStartButton();
+    }
+  }, START_RETRY_TIMEOUT_MSEC);
+}
 
 function setUiState(state, detail = '') {
   ui.state.dataset.state = state;
@@ -58,8 +78,9 @@ async function loadViewerConfig(runtime) {
 }
 
 function onShowStatus(status) {
+  const runChanged = latestStatus?.run_id && latestStatus.run_id !== status.run_id;
   latestStatus = status;
-  if (status.state !== 'waiting') startPending = false;
+  if (runChanged || status.state !== 'waiting') clearStartPending();
   const run = status.run_id ? `run ${status.run_id.slice(0, 8)}` : '';
   if (status.state === 'failed') setUiState('failed', status.error ?? 'Show Runner failed');
   else setUiState(status.state, run);
@@ -146,15 +167,18 @@ async function initialize() {
 
 ui.start.addEventListener('click', async () => {
   if (!controlClient || ui.start.disabled) return;
-  startPending = true;
+  beginStartPending();
   refreshStartButton();
   try {
     await controlClient.requestStart();
   } catch (error) {
-    startPending = false;
+    clearStartPending();
     setUiState('failed', error.message);
   }
 });
 
-window.addEventListener('beforeunload', () => controlClient?.stop());
+window.addEventListener('beforeunload', () => {
+  clearStartPending();
+  controlClient?.stop();
+});
 initialize().catch((error) => setUiState('failed', error.message));

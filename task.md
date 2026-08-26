@@ -149,8 +149,8 @@ Formation authoring、Transition planning、256機対応などの新機能はTas
 - [x] `run_id`、show hash、sequenceで開始要求の二重送信と二重起動を防止する
 - [x] Status heartbeatから、再読み込みしたブラウザが現在の実行状態を復元できるようにする
 - [x] Launcherの`stop`対象である既存show-runner assetだけを差し替える
-- [x] 全機の初期位置から一度だけ第三者カメラを構成し、離陸前の機体群を見渡せるようにする
-- [x] カメラ構成後は飛行へ追従せず、先行したユーザーのカメラ操作も上書きしない
+- [ ] 第三者カメラは専用presetとして再設計し、離陸前の機体群を見渡せるようにする
+- [ ] camera preset適用後は飛行へ追従せず、ユーザーのカメラ操作を上書きしない
 
 通信仕様は[`docs/show-control-protocol.md`](docs/show-control-protocol.md)を正本とする。
 

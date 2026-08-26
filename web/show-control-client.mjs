@@ -6,6 +6,7 @@ export class ShowControlClient {
     this.config = config;
     this.onStatus = onStatus;
     this.status = null;
+    this.lastStatusRunId = null;
     this.lastStatusSequence = 0;
     this.commandSequence = 0;
     this.pollTimer = null;
@@ -39,7 +40,12 @@ export class ShowControlClient {
     if (!raw) return;
     try {
       const status = decodeFrame(raw);
-      if (!status || status.kind !== 'status' || status.sequence <= this.lastStatusSequence) return;
+      if (!status || status.kind !== 'status') return;
+      if (status.run_id !== this.lastStatusRunId) {
+        this.lastStatusRunId = status.run_id;
+        this.lastStatusSequence = 0;
+      }
+      if (status.sequence <= this.lastStatusSequence) return;
       this.status = status;
       this.lastStatusSequence = status.sequence;
       this.onStatus(status);
