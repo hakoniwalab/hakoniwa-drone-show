@@ -73,6 +73,8 @@ scenario:
         self.assertIn('<section id="map-panel"', page[panel_start:panel_end])
         self.assertNotIn('id="splitter"', page)
         self.assertIn("#three-root { width: 100%; height: 100%;", style)
+        self.assertIn('id="camera-audience"', page)
+        self.assertIn('id="camera-free"', page)
 
     def test_default_sources_use_sibling_repositories(self) -> None:
         self.assertEqual(
@@ -98,6 +100,34 @@ scenario:
         self.assertEqual(experiment.letter_height_m, 5.0)
         self.assertEqual(experiment.letter_gap_m, 1.125)
         self.assertEqual(experiment.speed_m_s, 20.0)
+        viewer = recipe._viewer_settings(recipe.DEFAULT_EXPERIMENT)
+        self.assertEqual(viewer["initial_mode"], "audience")
+        self.assertEqual(
+            viewer["audience_camera"]["position_m"], [0.0, -30.0, 3.0]
+        )
+        compatible = recipe._load_base_compatible_experiment(
+            recipe.DEFAULT_EXPERIMENT
+        )
+        self.assertNotIn("viewer", compatible)
+
+    def test_audience_camera_rejects_unsupported_pitch(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            experiment = Path(temporary) / "experiment.yaml"
+            experiment.write_text(
+                """viewer:
+  initial_mode: audience
+  audience_camera:
+    position_m: [0, -40, 3]
+    yaw_deg: 90
+    pitch_deg: 90
+    fov_deg: 55
+""",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(
+                recipe.base.RecipeError, "pitch_deg must be between"
+            ):
+                recipe._viewer_settings(experiment)
 
     def test_configure_requires_city_world(self) -> None:
         stderr = io.StringIO()
@@ -208,6 +238,11 @@ scenario:
                     recipe, "_formation_scale_m", return_value=15.0
                 ),
                 mock.patch.object(
+                    recipe,
+                    "_viewer_settings",
+                    return_value={"initial_mode": "free"},
+                ),
+                mock.patch.object(
                     recipe.base, "resolve_experiment", return_value=experiment
                 ),
                 mock.patch.object(
@@ -251,7 +286,11 @@ scenario:
             self.assertEqual(city_configure.call_args.kwargs["process_count"], 6)
             self.assertEqual(
                 marker["drone_show"],
-                {"formation_scale_m": 15.0, "max_speed_m_s": 20.0},
+                {
+                    "formation_scale_m": 15.0,
+                    "max_speed_m_s": 20.0,
+                    "viewer": {"initial_mode": "free"},
+                },
             )
             extend_pdudef.assert_called_once_with(
                 recipe_config / "pdudef" / "drone-pdudef-current.json"

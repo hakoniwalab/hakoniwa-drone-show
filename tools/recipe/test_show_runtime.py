@@ -94,17 +94,21 @@ class ShowRuntimeTest(unittest.TestCase):
                     {"name": "show-runner", "args": ["old.py", "--show-json", "show.json"], "env": {"set": {"KEEP": "1"}}},
                     {"name": "web-bridge-fleets", "args": ["--config-root", "old", "--node-name", "node"]},
                     {"name": "visual-state-publisher", "args": ["vsp.json"]},
+                    {"name": "threejs-viewer-webserver", "args": ["-m", "http.server", "8000"]},
                 ]},
             )
             runner = root / "show_experience_runner.py"
             runner.touch()
             show_ir = root / "show-ir.json"
             show_ir.touch()
+            no_cache_server = root / "no_cache_http_server.py"
+            no_cache_server.touch()
             show_runtime.patch_launcher(
                 launcher_path,
                 show_runner=runner,
                 drone_root=root / "drone",
                 bridge_config_root=root / "bridge",
+                no_cache_http_server=no_cache_server,
                 show_ir_path=show_ir,
                 show_ir_max_speed_m_s=20.0,
             )
@@ -123,6 +127,10 @@ class ShowRuntimeTest(unittest.TestCase):
                 assets["show-runner"]["args"][speed_index + 1], "20.0"
             )
             self.assertEqual(assets["show-runner"]["env"]["set"]["KEEP"], "1")
+            self.assertEqual(
+                assets["threejs-viewer-webserver"]["args"],
+                [str(no_cache_server.resolve()), "8000"],
+            )
             self.assertEqual(assets["web-bridge-fleets"]["args"][1], str((root / "bridge").resolve()))
             self.assertEqual(assets["visual-state-publisher"]["args"], ["vsp.json"])
 
@@ -193,6 +201,17 @@ class ShowRuntimeTest(unittest.TestCase):
                 marker,
                 {
                     "drone_count": 2,
+                    "drone_show": {
+                        "viewer": {
+                            "initial_mode": "audience",
+                            "audience_camera": {
+                                "position_m": [0.0, -40.0, 3.0],
+                                "yaw_deg": 90.0,
+                                "pitch_deg": 35.0,
+                                "fov_deg": 55.0,
+                            },
+                        }
+                    },
                     "city_world": {
                         "origin": {
                             "latitude": 35.0,
@@ -223,8 +242,22 @@ class ShowRuntimeTest(unittest.TestCase):
                 viewer["three"]["droneAppearance"],
                 {"bodyColor": "#E8EDF2"},
             )
+            self.assertEqual(viewer["three"]["initialCameraMode"], "audience")
+            self.assertEqual(
+                viewer["three"]["audienceCamera"],
+                {
+                    "positionM": [0.0, -40.0, 3.0],
+                    "yawDeg": 90.0,
+                    "pitchDeg": 35.0,
+                    "fovDeg": 55.0,
+                },
+            )
             self.assertEqual(
                 runtime["led_appearance"], {"scale": 1.45, "intensity": 1.25}
+            )
+            self.assertEqual(
+                runtime["camera"],
+                {"initial_mode": "audience", "audience_available": True},
             )
             self.assertEqual(runtime["show_ir"]["url"], "./show-ir.json")
             self.assertEqual(

@@ -28,6 +28,14 @@
         <p id="show-detail">起動しています</p>
       </div>
       <button id="show-start" type="button" disabled>ドローンショー開始</button>
+      <section id="camera-panel" aria-label="カメラ視点">
+        <p class="camera-label">カメラ視点</p>
+        <div class="camera-buttons">
+          <button id="camera-audience" type="button" aria-pressed="false">観客視点</button>
+          <button id="camera-free" type="button" aria-pressed="false">自由視点</button>
+        </div>
+        <p id="camera-help" hidden>矢印: 前後左右 / U・D: 上下 / Shift: 高速<br>左ドラッグ: 横向き / 右ドラッグ: 仰角 / ホイール: 画角</p>
+      </section>
       <dl>
         <div><dt>表示中の機体</dt><dd id="drone-count">0 / 0</dd></div>
         <div><dt>通信</dt><dd>WebSocket :8765</dd></div>

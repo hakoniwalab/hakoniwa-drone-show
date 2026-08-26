@@ -128,13 +128,89 @@ def _max_speed_m_s(experiment_path: Path) -> float:
     return float(value)
 
 
+def _viewer_settings(experiment_path: Path) -> dict:
+    raw = _BASE_LOAD_SIMPLE_YAML(experiment_path)
+    viewer = raw.get("viewer")
+    if viewer is None:
+        return {"initial_mode": "free"}
+    if not isinstance(viewer, dict):
+        raise base.RecipeError("viewer must be a mapping")
+    unknown = sorted(set(viewer) - {"initial_mode", "audience_camera"})
+    if unknown:
+        raise base.RecipeError("viewer has unknown fields: " + ", ".join(unknown))
+    initial_mode = viewer.get("initial_mode", "free")
+    if initial_mode not in {"free", "audience"}:
+        raise base.RecipeError("viewer.initial_mode must be free or audience")
+    camera = viewer.get("audience_camera")
+    if initial_mode == "audience" and not isinstance(camera, dict):
+        raise base.RecipeError(
+            "viewer.audience_camera is required when initial_mode is audience"
+        )
+    if camera is None:
+        return {"initial_mode": initial_mode}
+    unknown_camera = sorted(
+        set(camera) - {"position_m", "yaw_deg", "pitch_deg", "fov_deg"}
+    )
+    if unknown_camera:
+        raise base.RecipeError(
+            "viewer.audience_camera has unknown fields: "
+            + ", ".join(unknown_camera)
+        )
+    position = camera.get("position_m")
+    if (
+        not isinstance(position, list)
+        or len(position) != 3
+        or any(
+            not isinstance(value, (int, float))
+            or isinstance(value, bool)
+            or not math.isfinite(float(value))
+            for value in position
+        )
+    ):
+        raise base.RecipeError(
+            "viewer.audience_camera.position_m must contain three finite numbers"
+        )
+    resolved = {}
+    for key in ("yaw_deg", "pitch_deg", "fov_deg"):
+        value = camera.get(key)
+        if (
+            not isinstance(value, (int, float))
+            or isinstance(value, bool)
+            or not math.isfinite(float(value))
+        ):
+            raise base.RecipeError(
+                f"viewer.audience_camera.{key} must be a finite number"
+            )
+        resolved[key] = float(value)
+    if not -85.0 <= resolved["pitch_deg"] <= 85.0:
+        raise base.RecipeError(
+            "viewer.audience_camera.pitch_deg must be between -85 and 85"
+        )
+    if not 25.0 <= resolved["fov_deg"] <= 90.0:
+        raise base.RecipeError(
+            "viewer.audience_camera.fov_deg must be between 25 and 90"
+        )
+    return {
+        "initial_mode": initial_mode,
+        "audience_camera": {
+            "position_m": [float(value) for value in position],
+            **resolved,
+        },
+    }
+
+
 def _load_base_compatible_experiment(path: Path):
     """Adapt the Show-facing scale to the generic word Recipe contract."""
 
     raw = _BASE_LOAD_SIMPLE_YAML(path)
+    viewer = raw.get("viewer")
+    if viewer is not None:
+        _viewer_settings(path)
     scenario = raw.get("scenario")
     if not isinstance(scenario, dict) or "formation" not in scenario:
-        return raw
+        compatible = copy.deepcopy(raw)
+        compatible.pop("viewer", None)
+        return compatible
     formation_scale_m = _formation_scale_m(path)
     maximum_speed_m_s = _max_speed_m_s(path)
     compatibility_fields = sorted(
@@ -146,6 +222,7 @@ def _load_base_compatible_experiment(path: Path):
             + ", ".join(compatibility_fields)
         )
     compatible = copy.deepcopy(raw)
+    compatible.pop("viewer", None)
     compatible_scenario = compatible["scenario"]
     del compatible_scenario["formation"]
     del compatible_scenario["max_speed_m_s"]
@@ -209,6 +286,7 @@ def _write_show_launcher(
         show_runner=SHOW_ROOT / "tools" / "show_experience_runner.py",
         drone_root=drone_root,
         bridge_config_root=bridge_root,
+        no_cache_http_server=SHOW_ROOT / "tools" / "no_cache_http_server.py",
         show_ir_path=paths.recipe_config
         / "scenario"
         / "show-ir"
@@ -336,6 +414,7 @@ def configure(args: argparse.Namespace, experiment_path: Path, drone_root: Path)
     formation_scale_m = _formation_scale_m(
         experiment_path, override=args.formation_scale
     )
+    viewer_settings = _viewer_settings(experiment_path)
     rc = base.configure(
         experiment_path,
         drone_root,
@@ -367,6 +446,7 @@ def configure(args: argparse.Namespace, experiment_path: Path, drone_root: Path)
     marker["drone_show"] = {
         "formation_scale_m": formation_scale_m,
         "max_speed_m_s": experiment.speed_m_s,
+        "viewer": viewer_settings,
     }
     (paths.recipe_config / "mujoco-city-fleet.json").write_text(
         json.dumps(marker, indent=2) + "\n", encoding="utf-8"

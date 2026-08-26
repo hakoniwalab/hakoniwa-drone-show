@@ -67,6 +67,21 @@ ENU各軸のaxis-aligned bounding boxは、回転によってこの値より小�
 | `runtime.visualization` | 真偽値 | VSP、WebBridge、HTTP ViewerをLauncherへ含めます。ブラウザ開始型のShowでは`true`が必須です。 |
 | `runtime.show_runner_real_time_sync` | 真偽値 | Show Runnerの進行をwall-clock時間へ同期します。観賞用Showでは通常`true`にします。 |
 
+### `viewer`
+
+| 項目 | 型・制約 | 説明 |
+|---|---|---|
+| `viewer.initial_mode` | `free`または`audience` | ブラウザ起動時の視点です。`free`は従来のOrbitカメラ、`audience`は下記の観客視点です。ブラウザ上でいつでも切り替えられます。 |
+| `viewer.audience_camera.position_m` | 3要素の数値配列 | 観客カメラの初期位置をローカルENU座標`[East, North, Up]`（m）で指定します。 |
+| `viewer.audience_camera.yaw_deg` | 数値 | 水平向きです。0度はEast、正方向はNorth側です。 |
+| `viewer.audience_camera.pitch_deg` | -85〜85 | 仰角です。0度は水平、正方向は上です。 |
+| `viewer.audience_camera.fov_deg` | 25〜90 | 垂直画角です。小さいほど望遠、大きいほど広角になります。 |
+
+観客視点では、矢印キーで前後左右、`U`/`D`で上下へ移動します。`Shift`を
+押しながら移動すると高速になります。左ドラッグでyaw、右ドラッグでpitch、
+マウスホイールでFOVを調整します。調整内容はブラウザ内だけに保持され、YAMLは
+自動更新されません。確定した値はYAMLへ反映して`configure`を再実行してください。
+
 ### `scenario`
 
 | 項目 | 型・制約 | 説明 |

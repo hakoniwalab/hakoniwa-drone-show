@@ -6,6 +6,9 @@ const ui = {
   detail: document.getElementById('show-detail'),
   start: document.getElementById('show-start'),
   droneCount: document.getElementById('drone-count'),
+  cameraAudience: document.getElementById('camera-audience'),
+  cameraFree: document.getElementById('camera-free'),
+  cameraHelp: document.getElementById('camera-help'),
 };
 
 let viewer = null;
@@ -22,6 +25,17 @@ let startPendingTimer = null;
 const markers = new Map();
 const ledStatesByDroneId = new Map();
 const START_RETRY_TIMEOUT_MSEC = 3000;
+
+function setCameraMode(mode) {
+  if (!viewer) return false;
+  const audience = mode === 'audience';
+  const changed = viewer.setAudienceCameraEnabled?.(audience) ?? false;
+  if (!changed && audience) return false;
+  ui.cameraAudience.setAttribute('aria-pressed', String(audience));
+  ui.cameraFree.setAttribute('aria-pressed', String(!audience));
+  ui.cameraHelp.hidden = !audience;
+  return true;
+}
 
 function clearStartPending() {
   startPending = false;
@@ -176,6 +190,14 @@ async function initialize() {
   viewer = createDroneViewer();
   viewer.configure(config);
   await viewer.initialize({ droneConfigPath: config.three.sceneConfigPath });
+  const audienceAvailable = runtime.camera?.audience_available === true;
+  ui.cameraAudience.disabled = !audienceAvailable;
+  ui.cameraFree.disabled = false;
+  setCameraMode(
+    audienceAvailable && runtime.camera?.initial_mode === 'audience'
+      ? 'audience'
+      : 'free',
+  );
   viewer.setNightMode(true);
   if (runtime.led_appearance) {
     if (typeof viewer.setDroneLedAppearance !== 'function') {
@@ -252,6 +274,9 @@ ui.start.addEventListener('click', async () => {
     setUiState('failed', error.message);
   }
 });
+
+ui.cameraAudience.addEventListener('click', () => setCameraMode('audience'));
+ui.cameraFree.addEventListener('click', () => setCameraMode('free'));
 
 window.addEventListener('beforeunload', () => {
   clearStartPending();

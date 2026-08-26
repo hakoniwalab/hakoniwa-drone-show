@@ -498,6 +498,22 @@ def materialize_browser(
     viewer_config.setdefault("three", {})["droneAppearance"] = {
         "bodyColor": "#E8EDF2"
     }
+    show_config = marker.get("drone_show", {})
+    viewer_settings = show_config.get("viewer", {})
+    if not isinstance(viewer_settings, dict):
+        raise ShowRuntimeError("drone_show.viewer must be an object")
+    initial_mode = viewer_settings.get("initial_mode", "free")
+    viewer_config["three"]["initialCameraMode"] = initial_mode
+    audience = viewer_settings.get("audience_camera")
+    if audience is not None:
+        viewer_config["three"]["audienceCamera"] = {
+            "positionM": audience["position_m"],
+            "yawDeg": audience["yaw_deg"],
+            "pitchDeg": audience["pitch_deg"],
+            "fovDeg": audience["fov_deg"],
+        }
+    else:
+        viewer_config["three"].pop("audienceCamera", None)
     viewer_config.setdefault("pdu", {})["pduDefPath"] = f"./{combined_name}"
     _write_json(viewer_config_path, viewer_config)
 
@@ -514,6 +530,10 @@ def materialize_browser(
         "led_appearance": {
             "scale": 1.45,
             "intensity": 1.25,
+        },
+        "camera": {
+            "initial_mode": initial_mode,
+            "audience_available": audience is not None,
         },
         "show_ir": {
             "url": "./show-ir.json",
@@ -536,6 +556,7 @@ def patch_launcher(
     show_runner: Path,
     drone_root: Path,
     bridge_config_root: Path,
+    no_cache_http_server: Path | None = None,
     show_ir_path: Path | None = None,
     show_ir_max_speed_m_s: float | None = None,
 ) -> Path:
@@ -583,5 +604,17 @@ def patch_launcher(
         raise ShowRuntimeError("WebBridge Launcher arguments are invalid")
     root_index = bridge_args.index("--config-root") + 1
     bridge_args[root_index] = str(bridge_config_root.resolve())
+    if no_cache_http_server is not None:
+        http_server = by_name.get("threejs-viewer-webserver")
+        if not isinstance(http_server, dict):
+            raise ShowRuntimeError(
+                "Launcher is missing threejs-viewer-webserver"
+            )
+        server_path = no_cache_http_server.resolve()
+        if not server_path.is_file():
+            raise ShowRuntimeError(
+                f"No-cache HTTP server does not exist: {server_path}"
+            )
+        http_server["args"] = [str(server_path), "8000"]
     _write_json(launcher_path, launcher)
     return launcher_path
