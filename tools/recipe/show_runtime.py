@@ -455,6 +455,10 @@ def materialize_browser(
         "websocket_url": "ws://127.0.0.1:8765",
         "origin": city["origin"],
         "expected_drone_count": int(marker["drone_count"]),
+        "led_appearance": {
+            "scale": 1.45,
+            "intensity": 1.25,
+        },
         "show_ir": {
             "url": "./show-ir.json",
             "sha256": _sha256(show_ir_path),

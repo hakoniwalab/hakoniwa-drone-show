@@ -162,6 +162,9 @@ class ShowRuntimeTest(unittest.TestCase):
 
             self.assertEqual((destination / "show-ir.json").read_bytes(), show_ir.read_bytes())
             runtime = json.loads((destination / "runtime-config.json").read_text())
+            self.assertEqual(
+                runtime["led_appearance"], {"scale": 1.45, "intensity": 1.25}
+            )
             self.assertEqual(runtime["show_ir"]["url"], "./show-ir.json")
             self.assertEqual(
                 runtime["show_ir"]["sha256"], show_runtime._sha256(show_ir)

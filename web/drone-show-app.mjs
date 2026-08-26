@@ -177,6 +177,12 @@ async function initialize() {
   viewer.configure(config);
   await viewer.initialize({ droneConfigPath: config.three.sceneConfigPath });
   viewer.setNightMode(true);
+  if (runtime.led_appearance) {
+    if (typeof viewer.setDroneLedAppearance !== 'function') {
+      throw new Error('Three.js Viewer does not support Drone Show LED appearance');
+    }
+    viewer.setDroneLedAppearance(runtime.led_appearance);
+  }
 
   let connected = false;
   while (!connected) {
