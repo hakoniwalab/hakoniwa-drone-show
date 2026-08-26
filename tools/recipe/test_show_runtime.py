@@ -98,19 +98,85 @@ class ShowRuntimeTest(unittest.TestCase):
             )
             runner = root / "show_experience_runner.py"
             runner.touch()
+            show_ir = root / "show-ir.json"
+            show_ir.touch()
             show_runtime.patch_launcher(
                 launcher_path,
                 show_runner=runner,
                 drone_root=root / "drone",
                 bridge_config_root=root / "bridge",
+                show_ir_path=show_ir,
             )
             launcher = json.loads(launcher_path.read_text())
             assets = {asset["name"]: asset for asset in launcher["assets"]}
             self.assertEqual(assets["show-runner"]["args"][0], str(runner.resolve()))
             self.assertIn("--wait-for-show-start", assets["show-runner"]["args"])
+            ir_index = assets["show-runner"]["args"].index("--show-ir")
+            self.assertEqual(
+                assets["show-runner"]["args"][ir_index + 1], str(show_ir.resolve())
+            )
             self.assertEqual(assets["show-runner"]["env"]["set"]["KEEP"], "1")
             self.assertEqual(assets["web-bridge-fleets"]["args"][1], str((root / "bridge").resolve()))
             self.assertEqual(assets["visual-state-publisher"]["args"], ["vsp.json"])
+
+    def test_configured_city_fleet_is_compiled_into_show_ir(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            recipe_config = root / "config"
+            legacy_formation = (
+                recipe_config / "scenario" / "formations" / "legacy.json"
+            )
+            write_json(
+                legacy_formation,
+                {"points": [[-20.0, 0.0, 0.0], [20.0, 0.0, 0.0]]},
+            )
+            write_json(
+                recipe_config / "scenario" / "show.json",
+                {
+                    "formation_files": [
+                        {"id": "legacy", "path": "formations/legacy.json"}
+                    ],
+                    "timeline": [
+                        {"formation": "A", "duration_sec": 8.0, "hold_sec": 6.0},
+                        {"formation": "B", "duration_sec": 8.0, "hold_sec": 6.0},
+                        {"formation": "C", "duration_sec": 8.0, "hold_sec": 6.0},
+                    ],
+                },
+            )
+            fleet_path = recipe_config / "drone" / "fleets" / "api-current.json"
+            drones = [
+                {
+                    "name": f"Drone-{index}",
+                    "position_meter": [float(index), 2.0, -3.0],
+                }
+                for index in range(1, 33)
+            ]
+            write_json(fleet_path, {"drones": drones})
+            show_ir_path = show_runtime.materialize_show_ir(
+                recipe_config=recipe_config,
+                marker={
+                    "drone_count": 32,
+                    "fleet_config": str(fleet_path),
+                    "flight_plan": {
+                        "resolved_flight_altitude_m": 50.0,
+                        "formation_audience_tilt_deg": 15.0,
+                    },
+                },
+            )
+            show_ir = json.loads(show_ir_path.read_text(encoding="utf-8"))
+            self.assertEqual(show_ir["drone_ids"], [f"Drone-{i}" for i in range(1, 33)])
+            self.assertEqual(
+                [frame["time_sec"] for frame in show_ir["timeline"]],
+                [0.0, 8.0, 14.0, 22.0, 28.0, 36.0, 42.0],
+            )
+            self.assertEqual(
+                show_ir["timeline"][0]["states"][0]["position_m"],
+                [2.0, 1.0, 3.0],
+            )
+            plan = json.loads(
+                (show_ir_path.parent / "show-plan.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(plan["defaults"]["transform"]["tilt_deg"], 75.0)
 
 
 if __name__ == "__main__":

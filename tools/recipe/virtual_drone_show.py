@@ -102,6 +102,10 @@ def _write_show_launcher(
         show_runner=SHOW_ROOT / "tools" / "show_experience_runner.py",
         drone_root=drone_root,
         bridge_config_root=bridge_root,
+        show_ir_path=paths.recipe_config
+        / "scenario"
+        / "show-ir"
+        / "show-ir.json",
     )
 
 
@@ -209,6 +213,10 @@ def configure(args: argparse.Namespace, experiment_path: Path, drone_root: Path)
     show_runtime.extend_asset_pdudef(
         paths.recipe_config / "pdudef" / "drone-pdudef-current.json"
     )
+    show_ir_path = show_runtime.materialize_show_ir(
+        recipe_config=paths.recipe_config,
+        marker=marker,
+    )
     launcher = paths.recipe_config / "launcher.json"
     launcher.unlink(missing_ok=True)
     plan = marker["flight_plan"]
@@ -217,6 +225,7 @@ def configure(args: argparse.Namespace, experiment_path: Path, drone_root: Path)
     print(f"City World             : {city_world}")
     print(f"Drone PRO              : {drone_root}")
     print(f"MuJoCo process models  : {len(marker['process_models'])}")
+    print(f"Show IR                : {show_ir_path}")
     print("Scenario               : takeoff -> " + " -> ".join(phases) + " -> final hold")
     print(
         "Flight altitude        : "

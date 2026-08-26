@@ -59,13 +59,40 @@ cd hakoniwa-drone-show
 python3 tools/recipe/virtual_drone_show.py configure \
   --mujoco-city-world \
   ../hakoniwa-business-pack/work/remote-operation/city-world-worker/jobs/<JOB_ID>/build/world/city-world-receipt.json \
-  --altitude-mode city-max-clearance
+  --altitude-mode route-clearance
 
 python3 tools/recipe/virtual_drone_show.py doctor
 python3 tools/recipe/virtual_drone_show.py start
 python3 tools/recipe/virtual_drone_show.py status
 python3 tools/recipe/virtual_drone_show.py open-viewer
 python3 tools/recipe/virtual_drone_show.py stop
+```
+
+`route-clearance`は離陸地点から各Formationまでの計画経路上にある最高コライダーを
+基準に飛行高度を決めます。ショーを近く見せる通常のデモではこちらを使用します。
+生成City全体で最も高い建物より上を常に飛ばしたい場合だけ、より保守的な
+`--altitude-mode city-max-clearance`を指定します。
+
+機体数とMuJoCoプロセス数の既定値はexperimentの`scale.drone_count`と
+`scale.process_count`で管理します。各プロセスの担当機数はこの2値から均等に自動分割
+されるため、`drones_per_process`は指定しません。例えば128機・6プロセスは
+`21, 21, 21, 21, 22, 22`機に分割されます。一度だけ上書きする場合はconfigureへ
+次のオプションを追加します。
+
+```bash
+  --drone-count 128 \
+  --process-count 6
+```
+
+configureはFleet分割、MuJoCoモデル、Show IR、Launcher設定を再生成します。稼働中の
+workspaceへconfigureを重ねず、先にRecipe所有Launcherを正規終了してください。
+`stop`はLauncher control endpointへ`terminate`を送り、管理アセットをcleanupします。
+シミュレーション状態だけを変更する`hako-cmd stop`の代用ではありません。
+
+```bash
+python3 tools/recipe/virtual_drone_show.py status
+python3 tools/recipe/virtual_drone_show.py stop
+# TERMINATEDを確認してからconfigureを再実行する
 ```
 
 `configure`はBusiness Packの汎用`drone-fleet-single-host` workspaceへ成果物を
@@ -141,7 +168,9 @@ python3 -m unittest tools.test_formation
 python3 -m unittest tools.test_show_ir
 ```
 
-現在のShow RunnerはまだShow IRを入力にしません。SVGからShow IRまでのオフライン
-toolchainは完成しており、次段階で既存ショーの実行経路へ接続します。
+`configure`は実際のFleet初期位置、Show-owned SVG、Show Planからruntime用Show IRを
+`config/scenario/show-ir/show-ir.json`へ自動生成します。Launcherは本リポジトリの
+Show Experience Runnerへ`--show-ir`を渡します。Drone PROの既存RunnerとICRA経路は
+変更せず、`--show-ir`がない場合は従来の`show.json`経路を利用します。
 
 現在の設計・実装タスクは[`task.md`](task.md)を参照してください。

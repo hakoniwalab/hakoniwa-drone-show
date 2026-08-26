@@ -93,6 +93,14 @@ class VirtualDroneShowTest(unittest.TestCase):
                 mock.patch.object(
                     recipe.show_runtime, "extend_asset_pdudef"
                 ) as extend_pdudef,
+                mock.patch.object(
+                    recipe.show_runtime,
+                    "materialize_show_ir",
+                    return_value=recipe_config
+                    / "scenario"
+                    / "show-ir"
+                    / "show-ir.json",
+                ) as materialize_show_ir,
                 redirect_stdout(io.StringIO()),
             ):
                 result = recipe.configure(
@@ -110,6 +118,10 @@ class VirtualDroneShowTest(unittest.TestCase):
             self.assertEqual(city_configure.call_args.kwargs["process_count"], 6)
             extend_pdudef.assert_called_once_with(
                 recipe_config / "pdudef" / "drone-pdudef-current.json"
+            )
+            materialize_show_ir.assert_called_once_with(
+                recipe_config=recipe_config,
+                marker=marker,
             )
 
     def test_show_operator_installs_additive_launcher_hook_and_page(self) -> None:

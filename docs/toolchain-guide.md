@@ -168,14 +168,25 @@ python3 tools/show_ir.py validate \
 Show IRは自動生成物です。位置、時刻、Drone ID、LEDが完全展開されているため、通常は
 手で編集しません。内容を変更する場合はSVGまたはShow Planを修正して再compileします。
 
-## 6. 現在の実行範囲
+## 6. City Show runtimeへの接続
 
-本手順で、SVGからShow IRまでのオフライン生成と検証は完結します。現在のShow Runnerは
-まだ従来の`show.json`を入力としているため、生成したShow IRをMuJoCoショーで直接実行する
-接続は次段階です。
+`virtual_drone_show.py configure`はオフライン手順と同じtoolchainを使い、次のruntime成果物を
+Business Pack workspaceの`config/scenario/show-ir/`へ生成します。
 
-接続時もICRAおよびDrone PROの既存Runnerは変更せず、本リポジトリのShow Experience
-RunnerへShow IR adapterを追加します。接続完了までは従来Recipeの実行手順を利用します。
+- `formations/*.json`: 指定機数でSVGを再sampleしたFormation
+- `show-plan.json`: Cityの安全高度、3 Formation、8秒移動、6秒holdを記述したPlan
+- `initial-fleet-state.json`: 生成済みFleet設定のNED初期位置をENUへ変換した状態
+- `show-ir.json`: Runnerが読む完全展開済みIR
+
+`doctor`または`start`で生成されるLauncherはShow Experience Runnerへ
+`--show-ir config/scenario/show-ir/show-ir.json`を追加します。IR adapterはframe間を
+DroneGoToの直線移動へ変換し、機体ごとの距離と区間時間から速度を求めます。任意の
+`--show-ir-max-speed-m-s`を指定した場合だけ速度を制限し、到達時間を安全側へ延長します。離陸と
+必要なservice初期化は実績のあるDrone PRO preludeを利用し、その後にIR timelineを実行します。
+
+LED値はIRへ解決済みですが、v0.1 runtimeはまだ表示へ反映しません。また、City runtimeは
+設定済みCity World原点に対するlocal ENUだけを受け付け、`placement`付きIRは明示的に拒否します。
+`--show-ir`を省略した直接起動では、従来の`show.json`経路がそのまま動作します。
 
 ## 7. 回帰テスト
 
@@ -184,4 +195,5 @@ python3 -m unittest discover -s tools -p 'test_*.py'
 ```
 
 テストはSVG変換の決定性、Formation参照hash、機体数、時刻展開、index／nearest-greedy
-割当、transform、hold、LED role解決、Show IR意味制約を確認します。
+割当、transform、hold、LED role解決、Show IR意味制約、runtime IR生成とLauncher接続を
+確認します。

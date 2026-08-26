@@ -5,7 +5,6 @@ experiment:
 
 scale:
   drone_count: 128
-  drones_per_process: 22
   process_count: 6
 
 runtime:

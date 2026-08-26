@@ -95,3 +95,17 @@ validatorはJSON Schemaで表現する構造制約に加え、先頭時刻、時
 Show IRは手書きせず、[`tools/show_compiler.py`](../tools/show_compiler.py)でShow Plan、
 Formation、Initial Fleet Stateから生成します。通し手順は
 [ツールチェーン利用手順](toolchain-guide.md)を参照してください。
+
+## runtime adapter
+
+本リポジトリのShow Experience Runnerは`--show-ir PATH`指定時にShow IR v0.1を検証し、
+全Drone IDがruntime fleetと同じ順序であることを確認してから実行します。local ENUの
+`[east, north, up]`はDroneGoToが受け取るROS/NWUの`[north, west, up]`へ一度だけ変換します。
+位置が同じ後続frameはhold、位置が異なるframeは直線移動として実行します。
+
+IR modeでは旧`show.json`を読みません。Drone PROの既存CLI parserとの互換性のため
+Launcherには旧引数も残りますが、機体割当、位置、時間、LEDの実行正本はShow IRです。
+
+現在のCity adapterは`placement`を扱わず、設定済みCity World原点に対するlocal ENUを
+要求します。LEDは読み込み・検証対象ですが、v0.1のViewer表示にはまだ反映しません。
+Drone PROの既存Runnerは変更しておらず、`--show-ir`未指定時は従来の`show.json`を実行します。

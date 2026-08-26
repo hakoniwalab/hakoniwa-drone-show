@@ -34,7 +34,7 @@ Launcherでruntimeを起動
 - 機体ごとのLED状態をPDUで送らず、Viewerも同じショー計画を解釈する
 - ショー全体の現在フェーズだけを、任意有効化できる低頻度のJSON PDUで通知する
 - 位置、LED、時間をShow Statusのシミュレーション時刻で同期する
-- `show.json`をオフライン検証とruntime実行の共通入力にする
+- Show Planを制作入力、Show IRをオフライン検証とruntime実行の共通入力にする
 - Formation原画、点群化、機体割当、移動経路を分離し、生成過程を再現可能にする
 - runtimeで場当たり的に割り当てず、遷移計画を原則オフラインで解決・検証する
 - Viewerには回転、傾斜、スケール、機体数を反映したresolved show planを公開する
@@ -178,7 +178,11 @@ Formation authoring、Transition planning、256機対応などの新機能はTas
 - [x] Show PlanのFormation参照、機体ID、時間、transform、steady LEDをSchema化する
 - [x] 現在の3 Formationと8秒移動・6秒holdを表すShow Planサンプルを追加する
 - [x] Formation、割当、移動時間、hold時間からShow IRをcompileする
-- [ ] 現在の3 FormationショーをShow IRから再現する
+- [x] 現在の3 FormationショーをShow IRから再現する
+- [x] Recipeが実Fleet初期位置と指定機数のFormationからruntime Show IRを自動生成する
+- [x] Show Experience RunnerへoptionalなShow IR adapterを追加する
+- [x] Show IR未指定時はDrone PROの従来`show.json`経路を維持する
+- [ ] MuJoCo実行で3 Formation、8秒移動、6秒holdをAcceptance確認する
 
 ## Task 2: Formation制作とオフライン移動計画
 

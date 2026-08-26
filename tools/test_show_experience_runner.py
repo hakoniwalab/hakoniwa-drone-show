@@ -7,7 +7,21 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from tools import show_control_protocol as protocol
-from tools.show_experience_runner import make_state_machine_class
+from tools.show_experience_runner import (
+    _control_args,
+    enu_to_drone_ros,
+    make_state_machine_class,
+    resolve_transition_speed,
+    show_ir_schedule,
+)
+
+
+def _state(drone_id: str, position: list[float]) -> dict:
+    return {
+        "drone_id": drone_id,
+        "position_m": position,
+        "led": {"rgb": [255, 255, 255], "brightness": 1.0},
+    }
 
 
 class _FakeHakopy:
@@ -107,6 +121,42 @@ class ShowExperienceRunnerTest(unittest.TestCase):
 
         self.runner.step_once()
         self.assertEqual(self.runner.base_step_count, 1)
+
+    def test_show_ir_control_argument_is_not_forwarded_to_drone_pro(self) -> None:
+        control, remaining = _control_args(
+            ["--show-ir", "show-ir.json", "--show-json", "show.json"]
+        )
+        self.assertEqual(control.show_ir, Path("show-ir.json"))
+        self.assertEqual(remaining, ["--show-json", "show.json"])
+
+    def test_show_ir_schedule_resolves_transition_and_hold_frames(self) -> None:
+        show_ir = {
+            "timeline": [
+                {"time_sec": 0.0, "states": [_state("Drone-1", [0, 0, 0])]},
+                {"time_sec": 8.0, "states": [_state("Drone-1", [1, 0, 5])]},
+                {"time_sec": 14.0, "states": [_state("Drone-1", [1, 0, 5])]},
+                {"time_sec": 22.0, "states": [_state("Drone-1", [2, 0, 5])]},
+                {"time_sec": 28.0, "states": [_state("Drone-1", [2, 0, 5])]},
+            ]
+        }
+        initial_hold, motions = show_ir_schedule(show_ir)
+        self.assertEqual(initial_hold, 0.0)
+        self.assertEqual([motion.duration_sec for motion in motions], [8.0, 8.0])
+        self.assertEqual([motion.hold_sec for motion in motions], [6.0, 6.0])
+
+    def test_show_ir_enu_is_converted_once_for_drone_goto(self) -> None:
+        self.assertEqual(enu_to_drone_ros([12.0, 34.0, 56.0]), (34.0, -12.0, 56.0))
+
+    def test_show_ir_speed_follows_frame_time_unless_explicitly_capped(self) -> None:
+        current = (0.0, 0.0, 0.0)
+        target = (0.0, 6.0, 8.0)
+        self.assertEqual(resolve_transition_speed(current, target, 2.0), 5.0)
+        self.assertEqual(
+            resolve_transition_speed(
+                current, target, 2.0, maximum_speed_m_s=3.0
+            ),
+            3.0,
+        )
 
 
 if __name__ == "__main__":
