@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-1 -1 2 2"
+     fill="none" stroke="#111827" stroke-width="0.025">
+  <title>Procedural round-ear face demo motif</title>
+  <ellipse id="head" data-led-role="outline" data-weight="0.60" cx="0" cy="0.08" rx="0.82" ry="0.70" fill="none"/>
+  <ellipse id="left-ear" data-led-role="outline" data-weight="0.16" cx="-0.61" cy="-0.48" rx="0.25" ry="0.27" fill="none"/>
+  <ellipse id="right-ear" data-led-role="outline" data-weight="0.16" cx="0.61" cy="-0.48" rx="0.25" ry="0.27" fill="none"/>
+  <ellipse id="left-eye" data-led-role="eyes" data-weight="0.07" cx="-0.27" cy="0.05" rx="0.065" ry="0.105" fill="none"/>
+  <ellipse id="right-eye" data-led-role="eyes" data-weight="0.07" cx="0.27" cy="0.05" rx="0.065" ry="0.105" fill="none"/>
+  <polygon id="mouth" data-led-role="mouth" data-weight="0.08" points="-0.14,0.30 0,0.39 0.14,0.30" fill="none"/>
+</svg>

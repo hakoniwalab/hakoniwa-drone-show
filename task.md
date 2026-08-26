@@ -172,7 +172,7 @@ Formation authoring、Transition planning、256機対応などの新機能はTas
 - [x] 箱庭runtimeに依存しないvalidatorと意味制約テストを追加する
 - [x] Formation JSONの責務、正規化座標、point/group ID、LED role、任意の既定LEDをSchema化する
 - [x] Formation JSONの最小サンプルとruntime非依存validatorを追加する
-- [ ] SVGから指定機体数のFormation JSONを生成する
+- [x] SVGから指定機体数のFormation JSONを生成する
 - [ ] Formation、割当、移動時間、hold時間からShow IRをcompileする
 - [ ] 現在の3 FormationショーをShow IRから再現する
 
@@ -188,14 +188,14 @@ Formation authoring、Transition planning、256機対応などの新機能はTas
 
 ### Formation authoring要件
 
-- [ ] 原画と、飛行に使う正規化済みFormation点群を別成果物として扱う
-- [ ] 初期入力形式としてSVGのpath、circle、rectとgroupを扱う
+- [x] 原画と、飛行に使う正規化済みFormation点群を別成果物として扱う
+- [x] 初期入力形式としてSVGのpath、circle、rectとgroupを扱う
 - [ ] PNG等の輪郭抽出は将来拡張とし、初期実装の必須条件にしない
-- [ ] 原画座標をCity World上の回転、傾斜、スケールから独立した正規座標で保持する
+- [x] 原画座標をCity World上の回転、傾斜、スケールから独立した正規座標で保持する
 - [ ] 輪郭線および塗り領域から、指定機数ちょうどの点を生成する
 - [ ] 点群の最小間隔と、輪郭・内部パーツへの配分を指定できるようにする
-- [ ] 各点へ安定したpoint ID、group ID、既定LED roleを付与できるようにする
-- [ ] 同じ入力と設定から同じ点群を生成するdeterministicな処理にする
+- [x] 各点へ安定したpoint ID、group ID、既定LED roleを付与できるようにする
+- [x] 同じ入力と設定から同じ点群を生成するdeterministicな処理にする
 - [ ] 入力素材の出典、ライセンス、hashと生成設定をShow Receiptから追跡可能にする
 - [ ] 2Dプレビューと、観客視点を含む3Dプレビューを生成できるようにする
 
@@ -222,9 +222,9 @@ Formation authoring、Transition planning、256機対応などの新機能はTas
 
 ### Acceptance Test
 
-- [ ] サンプルSVGから200点と256点のFormationを生成できる
+- [x] サンプルSVGから200点と256点のFormationを生成できる
 - [ ] 輪郭、目などの内部パーツ、LED groupが3Dプレビューで識別できる
-- [ ] 同じ入力を複数回処理した結果とhashが一致する
+- [x] 同じ入力を複数回処理した結果とhashが一致する
 - [ ] 全体最適割当の総移動距離が`index` baseline以下になる
 - [ ] 交差数、最小機体間隔、最大速度をstepごとにレポートできる
 - [ ] 制約違反時に、問題の機体、時刻、位置、必要な修正条件を表示できる

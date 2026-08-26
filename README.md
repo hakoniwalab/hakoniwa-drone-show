@@ -104,7 +104,11 @@ Formation JSONはSVG等から生成する再利用可能な正規化点群、Sho
 
 - [`docs/formation-v0.1.md`](docs/formation-v0.1.md)
 - [`schemas/formation-v0.1.schema.json`](schemas/formation-v0.1.schema.json)
+- [`assets/formations/`](assets/formations/)
 - [`examples/formations/diamond-4.json`](examples/formations/diamond-4.json)
+- [`examples/formations/round-ear-face-128.json`](examples/formations/round-ear-face-128.json)
+- [`examples/formations/cat-ear-face-128.json`](examples/formations/cat-ear-face-128.json)
+- [`examples/formations/long-ear-face-128.json`](examples/formations/long-ear-face-128.json)
 
 - [`docs/show-ir-v0.1.md`](docs/show-ir-v0.1.md)
 - [`schemas/show-ir-v0.1.schema.json`](schemas/show-ir-v0.1.schema.json)
@@ -114,12 +118,16 @@ Formation JSONはSVG等から生成する再利用可能な正規化点群、Sho
 
 ```bash
 python3 tools/formation.py validate examples/formations/diamond-4.json
+python3 tools/generate_demo_formations.py
+python3 tools/svg_to_formation.py assets/formations/round-ear-face.svg \
+  --formation-id round-ear-face-128 --points 128 \
+  --output /tmp/round-ear-face-128.json
 python3 tools/show_ir.py validate examples/show-ir/minimal.json
 python3 -m unittest tools.test_formation
 python3 -m unittest tools.test_show_ir
 ```
 
-現在のShow RunnerはまだShow IRを入力にしません。次段階でSVGからFormation点群を生成し、
-authoring planと機体割当からShow IRをcompileした後に、既存ショーの再現へ接続します。
+現在のShow RunnerはまだShow IRを入力にしません。次段階でauthoring planと機体割当から
+Show IRをcompileした後に、既存ショーの再現へ接続します。
 
 現在の設計・実装タスクは[`task.md`](task.md)を参照してください。

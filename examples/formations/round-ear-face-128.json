@@ -1,0 +1,1301 @@
+{
+  "schema_version": "0.1",
+  "formation_id": "round-ear-face-128",
+  "title": "Round-ear face (128 points)",
+  "coordinate_system": {
+    "frame": "FORMATION_LOCAL",
+    "axes": [
+      "right",
+      "up",
+      "depth"
+    ],
+    "position_unit": "normalized"
+  },
+  "source": {
+    "kind": "svg",
+    "sha256": "452f97d8e1f8e0b25e878ea07fdb9b0f49261f045686bd73cc109b86af7de84a",
+    "uri": "assets/formations/round-ear-face.svg"
+  },
+  "points": [
+    {
+      "point_id": "head-001",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        0.476744186047,
+        -0.036572499851,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-002",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        0.474249245931,
+        -0.077974328706,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-003",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        0.466872610376,
+        -0.118787976364,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-004",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        0.454796863794,
+        -0.158464697252,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-005",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        0.438305385642,
+        -0.19651823796,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-006",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        0.417754181476,
+        -0.232543000847,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-007",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        0.393541456381,
+        -0.266220376896,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-008",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        0.366049197119,
+        -0.297284527881,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-009",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        0.335648053482,
+        -0.325508045544,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-010",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        0.302806936636,
+        -0.350849867025,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-011",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        0.267863665366,
+        -0.373211368486,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-012",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        0.231113512432,
+        -0.39245939156,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-013",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        0.192943668876,
+        -0.408714169443,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-014",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        0.153571273407,
+        -0.421793500474,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-015",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        0.113322866137,
+        -0.431856823863,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-016",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        0.072414118661,
+        -0.438768663222,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-017",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        0.031108428668,
+        -0.442653947637,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-018",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        -0.010373764988,
+        -0.443394668038,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-019",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        -0.051799175203,
+        -0.441113731393,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-020",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        -0.092930860222,
+        -0.435682931453,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-021",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        -0.133547225621,
+        -0.427225471803,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-022",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        -0.173379707527,
+        -0.415622617388,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-023",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        -0.212191434247,
+        -0.400968665802,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-024",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        -0.249689742865,
+        -0.383219539233,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-025",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        -0.285564187426,
+        -0.362387864394,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-026",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        -0.319542205524,
+        -0.338586823694,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-027",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        -0.351173401437,
+        -0.311746121233,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-028",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        -0.380150976565,
+        -0.28206697239,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-029",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        -0.406088710006,
+        -0.249698889686,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-030",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        -0.428571247277,
+        -0.214839477625,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-031",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        -0.44710896103,
+        -0.177732705888,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-032",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        -0.461399897494,
+        -0.138797838191,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-033",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        -0.471126688559,
+        -0.098483150914,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-034",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        -0.476052797966,
+        -0.057307067591,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-035",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        -0.476052797966,
+        -0.01583793211,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-036",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        -0.471126688559,
+        0.025338151213,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-037",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        -0.461399897494,
+        0.065652838489,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-038",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        -0.44710896103,
+        0.104587706187,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-039",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        -0.428571247277,
+        0.141694477924,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-040",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        -0.406088710006,
+        0.176553889984,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-041",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        -0.380150976565,
+        0.208921972689,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-042",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        -0.351173401437,
+        0.238601121532,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-043",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        -0.319542205524,
+        0.265441823993,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-044",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        -0.285564187426,
+        0.289242864693,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-045",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        -0.249689742865,
+        0.310074539531,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-046",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        -0.212191434247,
+        0.3278236661,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-047",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        -0.173379707527,
+        0.342477617686,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-048",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        -0.133547225621,
+        0.354080472102,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-049",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        -0.092930860222,
+        0.362537931751,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-050",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        -0.051799175203,
+        0.367968731691,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-051",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        -0.010373764988,
+        0.370249668337,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-052",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        0.031108428668,
+        0.369508947935,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-053",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        0.072414118661,
+        0.36562366352,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-054",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        0.113322866137,
+        0.358711824162,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-055",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        0.153571273407,
+        0.348648500772,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-056",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        0.192943668876,
+        0.335569169742,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-057",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        0.231113512432,
+        0.319314391859,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-058",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        0.267863665366,
+        0.300066368785,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-059",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        0.302806936636,
+        0.277704867323,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-060",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        0.335648053482,
+        0.252363045842,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-061",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        0.366049197119,
+        0.224139528179,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-062",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        0.393541456381,
+        0.193075377194,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-063",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        0.417754181476,
+        0.159398001145,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-064",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        0.438305385642,
+        0.123373238259,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-065",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        0.454796863794,
+        0.08531969755,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-066",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        0.466872610376,
+        0.045642976663,
+        0.0
+      ]
+    },
+    {
+      "point_id": "head-067",
+      "group_id": "head",
+      "led_role": "outline",
+      "position": [
+        0.474249245931,
+        0.004829329004,
+        0.0
+      ]
+    },
+    {
+      "point_id": "left-ear-001",
+      "group_id": "left-ear",
+      "led_role": "outline",
+      "position": [
+        -0.209302325581,
+        0.289008895498,
+        0.0
+      ]
+    },
+    {
+      "point_id": "left-ear-002",
+      "group_id": "left-ear",
+      "led_role": "outline",
+      "position": [
+        -0.217504495657,
+        0.237086935161,
+        0.0
+      ]
+    },
+    {
+      "point_id": "left-ear-003",
+      "group_id": "left-ear",
+      "led_role": "outline",
+      "position": [
+        -0.241593115588,
+        0.190392636478,
+        0.0
+      ]
+    },
+    {
+      "point_id": "left-ear-004",
+      "group_id": "left-ear",
+      "led_role": "outline",
+      "position": [
+        -0.279854831117,
+        0.15444001915,
+        0.0
+      ]
+    },
+    {
+      "point_id": "left-ear-005",
+      "group_id": "left-ear",
+      "led_role": "outline",
+      "position": [
+        -0.328429648782,
+        0.134623122958,
+        0.0
+      ]
+    },
+    {
+      "point_id": "left-ear-006",
+      "group_id": "left-ear",
+      "led_role": "outline",
+      "position": [
+        -0.380872676799,
+        0.134623122958,
+        0.0
+      ]
+    },
+    {
+      "point_id": "left-ear-007",
+      "group_id": "left-ear",
+      "led_role": "outline",
+      "position": [
+        -0.429447494465,
+        0.15444001915,
+        0.0
+      ]
+    },
+    {
+      "point_id": "left-ear-008",
+      "group_id": "left-ear",
+      "led_role": "outline",
+      "position": [
+        -0.467709209993,
+        0.190392636478,
+        0.0
+      ]
+    },
+    {
+      "point_id": "left-ear-009",
+      "group_id": "left-ear",
+      "led_role": "outline",
+      "position": [
+        -0.491797829924,
+        0.237086935161,
+        0.0
+      ]
+    },
+    {
+      "point_id": "left-ear-010",
+      "group_id": "left-ear",
+      "led_role": "outline",
+      "position": [
+        -0.5,
+        0.289008895498,
+        0.0
+      ]
+    },
+    {
+      "point_id": "left-ear-011",
+      "group_id": "left-ear",
+      "led_role": "outline",
+      "position": [
+        -0.491797829924,
+        0.340930855835,
+        0.0
+      ]
+    },
+    {
+      "point_id": "left-ear-012",
+      "group_id": "left-ear",
+      "led_role": "outline",
+      "position": [
+        -0.467709209993,
+        0.387625154518,
+        0.0
+      ]
+    },
+    {
+      "point_id": "left-ear-013",
+      "group_id": "left-ear",
+      "led_role": "outline",
+      "position": [
+        -0.429447494465,
+        0.423577771846,
+        0.0
+      ]
+    },
+    {
+      "point_id": "left-ear-014",
+      "group_id": "left-ear",
+      "led_role": "outline",
+      "position": [
+        -0.380872676799,
+        0.443394668038,
+        0.0
+      ]
+    },
+    {
+      "point_id": "left-ear-015",
+      "group_id": "left-ear",
+      "led_role": "outline",
+      "position": [
+        -0.328429648782,
+        0.443394668038,
+        0.0
+      ]
+    },
+    {
+      "point_id": "left-ear-016",
+      "group_id": "left-ear",
+      "led_role": "outline",
+      "position": [
+        -0.279854831117,
+        0.423577771846,
+        0.0
+      ]
+    },
+    {
+      "point_id": "left-ear-017",
+      "group_id": "left-ear",
+      "led_role": "outline",
+      "position": [
+        -0.241593115588,
+        0.387625154518,
+        0.0
+      ]
+    },
+    {
+      "point_id": "left-ear-018",
+      "group_id": "left-ear",
+      "led_role": "outline",
+      "position": [
+        -0.217504495657,
+        0.340930855835,
+        0.0
+      ]
+    },
+    {
+      "point_id": "right-ear-001",
+      "group_id": "right-ear",
+      "led_role": "outline",
+      "position": [
+        0.5,
+        0.289008895498,
+        0.0
+      ]
+    },
+    {
+      "point_id": "right-ear-002",
+      "group_id": "right-ear",
+      "led_role": "outline",
+      "position": [
+        0.491797829924,
+        0.237086935161,
+        0.0
+      ]
+    },
+    {
+      "point_id": "right-ear-003",
+      "group_id": "right-ear",
+      "led_role": "outline",
+      "position": [
+        0.467709209993,
+        0.190392636478,
+        0.0
+      ]
+    },
+    {
+      "point_id": "right-ear-004",
+      "group_id": "right-ear",
+      "led_role": "outline",
+      "position": [
+        0.429447494465,
+        0.15444001915,
+        0.0
+      ]
+    },
+    {
+      "point_id": "right-ear-005",
+      "group_id": "right-ear",
+      "led_role": "outline",
+      "position": [
+        0.380872676799,
+        0.134623122958,
+        0.0
+      ]
+    },
+    {
+      "point_id": "right-ear-006",
+      "group_id": "right-ear",
+      "led_role": "outline",
+      "position": [
+        0.328429648782,
+        0.134623122958,
+        0.0
+      ]
+    },
+    {
+      "point_id": "right-ear-007",
+      "group_id": "right-ear",
+      "led_role": "outline",
+      "position": [
+        0.279854831117,
+        0.15444001915,
+        0.0
+      ]
+    },
+    {
+      "point_id": "right-ear-008",
+      "group_id": "right-ear",
+      "led_role": "outline",
+      "position": [
+        0.241593115588,
+        0.190392636478,
+        0.0
+      ]
+    },
+    {
+      "point_id": "right-ear-009",
+      "group_id": "right-ear",
+      "led_role": "outline",
+      "position": [
+        0.217504495657,
+        0.237086935161,
+        0.0
+      ]
+    },
+    {
+      "point_id": "right-ear-010",
+      "group_id": "right-ear",
+      "led_role": "outline",
+      "position": [
+        0.209302325581,
+        0.289008895498,
+        0.0
+      ]
+    },
+    {
+      "point_id": "right-ear-011",
+      "group_id": "right-ear",
+      "led_role": "outline",
+      "position": [
+        0.217504495657,
+        0.340930855835,
+        0.0
+      ]
+    },
+    {
+      "point_id": "right-ear-012",
+      "group_id": "right-ear",
+      "led_role": "outline",
+      "position": [
+        0.241593115588,
+        0.387625154518,
+        0.0
+      ]
+    },
+    {
+      "point_id": "right-ear-013",
+      "group_id": "right-ear",
+      "led_role": "outline",
+      "position": [
+        0.279854831117,
+        0.423577771846,
+        0.0
+      ]
+    },
+    {
+      "point_id": "right-ear-014",
+      "group_id": "right-ear",
+      "led_role": "outline",
+      "position": [
+        0.328429648782,
+        0.443394668038,
+        0.0
+      ]
+    },
+    {
+      "point_id": "right-ear-015",
+      "group_id": "right-ear",
+      "led_role": "outline",
+      "position": [
+        0.380872676799,
+        0.443394668038,
+        0.0
+      ]
+    },
+    {
+      "point_id": "right-ear-016",
+      "group_id": "right-ear",
+      "led_role": "outline",
+      "position": [
+        0.429447494465,
+        0.423577771846,
+        0.0
+      ]
+    },
+    {
+      "point_id": "right-ear-017",
+      "group_id": "right-ear",
+      "led_role": "outline",
+      "position": [
+        0.467709209993,
+        0.387625154518,
+        0.0
+      ]
+    },
+    {
+      "point_id": "right-ear-018",
+      "group_id": "right-ear",
+      "led_role": "outline",
+      "position": [
+        0.491797829924,
+        0.340930855835,
+        0.0
+      ]
+    },
+    {
+      "point_id": "left-eye-001",
+      "group_id": "left-eye",
+      "led_role": "eyes",
+      "position": [
+        -0.119186046512,
+        -0.019130639386,
+        0.0
+      ]
+    },
+    {
+      "point_id": "left-eye-002",
+      "group_id": "left-eye",
+      "led_role": "eyes",
+      "position": [
+        -0.127468912434,
+        -0.057256510251,
+        0.0
+      ]
+    },
+    {
+      "point_id": "left-eye-003",
+      "group_id": "left-eye",
+      "led_role": "eyes",
+      "position": [
+        -0.156976744186,
+        -0.080177151013,
+        0.0
+      ]
+    },
+    {
+      "point_id": "left-eye-004",
+      "group_id": "left-eye",
+      "led_role": "eyes",
+      "position": [
+        -0.186484575938,
+        -0.057256510251,
+        0.0
+      ]
+    },
+    {
+      "point_id": "left-eye-005",
+      "group_id": "left-eye",
+      "led_role": "eyes",
+      "position": [
+        -0.19476744186,
+        -0.019130639386,
+        0.0
+      ]
+    },
+    {
+      "point_id": "left-eye-006",
+      "group_id": "left-eye",
+      "led_role": "eyes",
+      "position": [
+        -0.186484575938,
+        0.01899523148,
+        0.0
+      ]
+    },
+    {
+      "point_id": "left-eye-007",
+      "group_id": "left-eye",
+      "led_role": "eyes",
+      "position": [
+        -0.156976744186,
+        0.041915872242,
+        0.0
+      ]
+    },
+    {
+      "point_id": "left-eye-008",
+      "group_id": "left-eye",
+      "led_role": "eyes",
+      "position": [
+        -0.127468912434,
+        0.01899523148,
+        0.0
+      ]
+    },
+    {
+      "point_id": "right-eye-001",
+      "group_id": "right-eye",
+      "led_role": "eyes",
+      "position": [
+        0.19476744186,
+        -0.019130639386,
+        0.0
+      ]
+    },
+    {
+      "point_id": "right-eye-002",
+      "group_id": "right-eye",
+      "led_role": "eyes",
+      "position": [
+        0.186484575938,
+        -0.057256510251,
+        0.0
+      ]
+    },
+    {
+      "point_id": "right-eye-003",
+      "group_id": "right-eye",
+      "led_role": "eyes",
+      "position": [
+        0.156976744186,
+        -0.080177151013,
+        0.0
+      ]
+    },
+    {
+      "point_id": "right-eye-004",
+      "group_id": "right-eye",
+      "led_role": "eyes",
+      "position": [
+        0.127468912434,
+        -0.057256510251,
+        0.0
+      ]
+    },
+    {
+      "point_id": "right-eye-005",
+      "group_id": "right-eye",
+      "led_role": "eyes",
+      "position": [
+        0.119186046512,
+        -0.019130639386,
+        0.0
+      ]
+    },
+    {
+      "point_id": "right-eye-006",
+      "group_id": "right-eye",
+      "led_role": "eyes",
+      "position": [
+        0.127468912434,
+        0.01899523148,
+        0.0
+      ]
+    },
+    {
+      "point_id": "right-eye-007",
+      "group_id": "right-eye",
+      "led_role": "eyes",
+      "position": [
+        0.156976744186,
+        0.041915872242,
+        0.0
+      ]
+    },
+    {
+      "point_id": "right-eye-008",
+      "group_id": "right-eye",
+      "led_role": "eyes",
+      "position": [
+        0.186484575938,
+        0.01899523148,
+        0.0
+      ]
+    },
+    {
+      "point_id": "mouth-001",
+      "group_id": "mouth",
+      "led_role": "mouth",
+      "position": [
+        -0.081395348837,
+        -0.164479476595,
+        0.0
+      ]
+    },
+    {
+      "point_id": "mouth-002",
+      "group_id": "mouth",
+      "led_role": "mouth",
+      "position": [
+        -0.048092378998,
+        -0.185888528634,
+        0.0
+      ]
+    },
+    {
+      "point_id": "mouth-003",
+      "group_id": "mouth",
+      "led_role": "mouth",
+      "position": [
+        -0.01478940916,
+        -0.207297580673,
+        0.0
+      ]
+    },
+    {
+      "point_id": "mouth-004",
+      "group_id": "mouth",
+      "led_role": "mouth",
+      "position": [
+        0.018513560679,
+        -0.204903483268,
+        0.0
+      ]
+    },
+    {
+      "point_id": "mouth-005",
+      "group_id": "mouth",
+      "led_role": "mouth",
+      "position": [
+        0.051816530518,
+        -0.183494431229,
+        0.0
+      ]
+    },
+    {
+      "point_id": "mouth-006",
+      "group_id": "mouth",
+      "led_role": "mouth",
+      "position": [
+        0.076968046393,
+        -0.164479476595,
+        0.0
+      ]
+    },
+    {
+      "point_id": "mouth-007",
+      "group_id": "mouth",
+      "led_role": "mouth",
+      "position": [
+        0.037377197586,
+        -0.164479476595,
+        0.0
+      ]
+    },
+    {
+      "point_id": "mouth-008",
+      "group_id": "mouth",
+      "led_role": "mouth",
+      "position": [
+        -0.002213651222,
+        -0.164479476595,
+        0.0
+      ]
+    },
+    {
+      "point_id": "mouth-009",
+      "group_id": "mouth",
+      "led_role": "mouth",
+      "position": [
+        -0.04180450003,
+        -0.164479476595,
+        0.0
+      ]
+    }
+  ]
+}

@@ -75,3 +75,55 @@ python3 tools/formation.py validate examples/formations/diamond-4.json
 ```
 
 validatorは構造、座標、LED範囲に加えてpoint IDの一意性を検証します。
+
+現行3フェーズデモの抽象モチーフは、SVG原画と128点のFormationとして次に格納します。
+
+- `assets/formations/round-ear-face.svg` → `examples/formations/round-ear-face-128.json`
+- `assets/formations/cat-ear-face.svg` → `examples/formations/cat-ear-face-128.json`
+- `assets/formations/long-ear-face.svg` → `examples/formations/long-ear-face-128.json`
+
+これらは特定キャラクターの公式データではなく、円・多角形・楕円から構成した手続き的な
+デモ図形です。SVGが原画の正本であり、JSONは次のコマンドで決定的に再生成できます。
+
+```bash
+python3 tools/generate_demo_formations.py
+python3 tools/formation.py validate examples/formations/round-ear-face-128.json
+python3 tools/formation.py validate examples/formations/cat-ear-face-128.json
+python3 tools/formation.py validate examples/formations/long-ear-face-128.json
+```
+
+各部品は`head`、`left-eye`等のgroupを保ち、`outline`、`eyes`、`mouth`、`accent`
+というLED roleを持ちます。色・点滅・表示時間はFormationでは固定せず、Show Planで
+指定します。
+
+## SVGからの変換
+
+任意のSVGは次のように変換します。
+
+```bash
+python3 tools/svg_to_formation.py assets/formations/round-ear-face.svg \
+  --formation-id round-ear-face-128 \
+  --points 128 \
+  --title "Round-ear face (128 points)" \
+  --source-uri assets/formations/round-ear-face.svg \
+  --output examples/formations/round-ear-face-128.json
+```
+
+初版converterは外部Pythonパッケージに依存せず、各要素の輪郭を等弧長sampleします。
+
+- 対応要素: `path`、`circle`、`ellipse`、`rect`、`line`、`polyline`、`polygon`、`g`
+- 対応path command: `M`、`L`、`H`、`V`、`C`、`S`、`Q`、`T`、`Z`と各相対形式
+- 対応transform: `matrix`、`translate`、`scale`、`rotate`、`skewX`、`skewY`
+- SVGの`id`または`data-group-id`をFormationの`group_id`へ引き継ぐ
+- `data-led-role`を`led_role`へ引き継ぎ、未指定時は`default`とする
+- 各輪郭の`data-weight`を点数配分比に使い、未指定時は輪郭長で自動配分する
+- SVGの下向きYをFormationの上向き`up`へ反転し、sample後に正規化する
+- 非表示要素と`defs`は点群化しない
+- 入力SVGのSHA-256と追跡用URIをFormationの`source`へ記録する
+
+同じ`group_id`を複数要素に付けることは可能で、point IDの連番はgroup全体で一意に
+なります。`data-weight`はSVG標準属性ではなく、本ツール用のauthoring hintです。
+
+SVG arc path command `A`、`use`参照、stroke幅、塗り領域の内部sample、CSSによる複雑な
+表示判定は初版の対象外です。arcは`circle`／`ellipse`またはBezier pathへ変換してから
+入力します。未対応commandは黙って無視せず、明確な変換エラーにします。
