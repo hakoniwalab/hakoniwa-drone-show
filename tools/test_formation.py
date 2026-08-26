@@ -43,13 +43,12 @@ class FormationTest(unittest.TestCase):
         with self.assertRaisesRegex(FormationValidationError, "centered at 0"):
             validate_formation(self.value)
 
-    def test_default_led_is_optional(self) -> None:
-        del self.value["points"][0]["default_led"]
-        validate_formation(self.value)
-
-    def test_default_led_is_checked_when_present(self) -> None:
-        self.value["points"][0]["default_led"]["brightness"] = 1.5
-        with self.assertRaisesRegex(FormationValidationError, r"within \[0, 1\]"):
+    def test_led_state_belongs_to_show_plan(self) -> None:
+        self.value["points"][0]["default_led"] = {
+            "rgb": [255, 0, 0],
+            "brightness": 1.0,
+        }
+        with self.assertRaisesRegex(FormationValidationError, "unknown fields: default_led"):
             validate_formation(self.value)
 
 

@@ -350,7 +350,11 @@ def _length(points: tuple[tuple[float, float], ...], closed: bool) -> float:
     pairs = list(zip(points, points[1:]))
     if closed:
         pairs.append((points[-1], points[0]))
-    return sum(math.hypot(end[0] - start[0], end[1] - start[1]) for start, end in pairs)
+    return sum(
+        length
+        for start, end in pairs
+        if (length := math.hypot(end[0] - start[0], end[1] - start[1])) > 0.0
+    )
 
 
 def _collect_outlines(root: ET.Element) -> list[Outline]:
@@ -431,10 +435,18 @@ def _allocate(outlines: list[Outline], count: int) -> list[int]:
 
 
 def _sample(outline: Outline, count: int) -> list[tuple[float, float]]:
-    segments = list(zip(outline.points, outline.points[1:]))
+    candidate_segments = list(zip(outline.points, outline.points[1:]))
     if outline.closed:
-        segments.append((outline.points[-1], outline.points[0]))
-    lengths = [math.hypot(end[0] - start[0], end[1] - start[1]) for start, end in segments]
+        candidate_segments.append((outline.points[-1], outline.points[0]))
+    measured = [
+        (start, end, math.hypot(end[0] - start[0], end[1] - start[1]))
+        for start, end in candidate_segments
+    ]
+    measured = [item for item in measured if item[2] > 0.0]
+    if not measured:
+        raise SvgConversionError(f"SVG group {outline.group_id!r} has zero-length geometry")
+    segments = [(start, end) for start, end, _ in measured]
+    lengths = [length for _, _, length in measured]
     perimeter = sum(lengths)
     denominator = count if outline.closed else max(1, count - 1)
     samples: list[tuple[float, float]] = []

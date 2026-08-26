@@ -73,6 +73,24 @@ class SvgToFormationTest(unittest.TestCase):
         svg = """<svg xmlns="http://www.w3.org/2000/svg"><ellipse id="ring" cx="2" cy="3" rx="2" ry="1"/></svg>"""
         self.assertEqual(self.convert(svg), self.convert(svg))
 
+    def test_consecutive_duplicate_points_are_ignored(self) -> None:
+        document = self.convert(
+            """<svg xmlns="http://www.w3.org/2000/svg">
+              <path id="outline" d="M 0 0 L 0 0 L 10 0 L 10 10 L 0 10 L 0 0 Z"/>
+            </svg>""",
+            points=32,
+        )
+        self.assertEqual(len(document["points"]), 32)
+        self.assertEqual(len({tuple(point["position"]) for point in document["points"]}), 32)
+
+    def test_all_duplicate_points_report_zero_length(self) -> None:
+        with self.assertRaisesRegex(SvgConversionError, "zero-length geometry"):
+            self.convert(
+                """<svg xmlns="http://www.w3.org/2000/svg">
+                  <polyline id="invalid" points="1,1 1,1 1,1"/>
+                </svg>"""
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

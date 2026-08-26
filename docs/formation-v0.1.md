@@ -3,7 +3,7 @@
 ## 目的
 
 Formation JSONは、SVG等から生成した再利用可能な形状点群です。点の形状上の意味と
-既定LED属性を保持しますが、特定のショー、機体、時刻、City Worldには依存しません。
+LED roleを保持しますが、特定のショー、LED状態、機体、時刻、City Worldには依存しません。
 
 ```text
 SVG / future authoring input
@@ -24,7 +24,7 @@ Formation JSONに含めるもの:
 - 指定個数へsample済みのpoints
 - point IDとgroup ID
 - Formationローカルの正規化位置
-- 各pointの`led_role`と任意の既定RGB・brightness
+- 各pointの`led_role`
 - 任意の入力種別、入力hash、URI
 
 Formation JSONに含めないもの:
@@ -35,6 +35,7 @@ Formation JSONに含めないもの:
 - City Worldの緯度・経度・heading
 - 前後Formation間のtrajectory
 - SVG pathやベンダー固有field
+- LEDのRGB、brightness、点灯effect
 
 Show Planは複数のFormationを参照し、順序、transform、移動時間、hold時間、LED演出を
 指定します。compilerはそれらを割当・時刻付きのShow IRへ完全展開します。Show IRは
@@ -56,8 +57,7 @@ SVG変換器はsample後のbounding box中心を原点とし、最大extentが1�
 - `group_id`は輪郭、目、内部パーツなどの意味的なまとまりを表す
 - `led_role`はShow Planから色や点灯効果を指定するための意味的な役割を表す
 - `points`の順序も同じ入力から決定的に生成する
-- `default_led`は任意で、指定する場合のRGBは0..255、brightnessは0..1
-- Show Planに指定がなく`default_led`もない場合はcompilerが白、brightness=1を適用する
+- LEDのRGB、brightness、点灯effectはShow Planだけが所有する
 
 point IDとgroup IDは機体割当時の連続性やLED roleの解決に利用できますが、Drone IDでは
 ありません。

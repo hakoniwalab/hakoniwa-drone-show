@@ -171,11 +171,11 @@ def compile_show(
             target_positions,
             strategy,
         )
-        default_led, role_leds = _led_map(plan, step)
+        default_led_state, role_leds = _led_map(plan, step)
         target_states = []
         for drone_id, point_index in zip(drone_ids, assignments):
             point = formation["points"][point_index]
-            led = role_leds.get(point["led_role"], default_led)
+            led = role_leds.get(point["led_role"], default_led_state)
             target_states.append(
                 {
                     "drone_id": drone_id,

@@ -64,24 +64,6 @@
       "minItems": 3,
       "maxItems": 3
     },
-    "led": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["rgb", "brightness"],
-      "properties": {
-        "rgb": {
-          "type": "array",
-          "prefixItems": [
-            { "type": "integer", "minimum": 0, "maximum": 255 },
-            { "type": "integer", "minimum": 0, "maximum": 255 },
-            { "type": "integer", "minimum": 0, "maximum": 255 }
-          ],
-          "minItems": 3,
-          "maxItems": 3
-        },
-        "brightness": { "type": "number", "minimum": 0, "maximum": 1 }
-      }
-    },
     "point": {
       "type": "object",
       "additionalProperties": false,
@@ -90,8 +72,7 @@
         "point_id": { "$ref": "#/$defs/identifier" },
         "group_id": { "$ref": "#/$defs/identifier" },
         "led_role": { "$ref": "#/$defs/identifier" },
-        "position": { "$ref": "#/$defs/position" },
-        "default_led": { "$ref": "#/$defs/led" }
+        "position": { "$ref": "#/$defs/position" }
       }
     }
   }

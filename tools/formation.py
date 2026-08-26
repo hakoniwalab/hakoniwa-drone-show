@@ -62,22 +62,6 @@ def _number(value: Any, path: str) -> float:
     return result
 
 
-def _validate_led(value: Any, path: str) -> None:
-    led = _object(value, path)
-    _keys(led, path, required={"rgb", "brightness"})
-    rgb = led["rgb"]
-    if not isinstance(rgb, list) or len(rgb) != 3:
-        _fail(f"{path}.rgb", "must contain exactly three integers")
-    for index, component in enumerate(rgb):
-        if isinstance(component, bool) or not isinstance(component, int):
-            _fail(f"{path}.rgb[{index}]", "must be an integer")
-        if not 0 <= component <= 255:
-            _fail(f"{path}.rgb[{index}]", "must be within [0, 255]")
-    brightness = _number(led["brightness"], f"{path}.brightness")
-    if not 0 <= brightness <= 1:
-        _fail(f"{path}.brightness", "must be within [0, 1]")
-
-
 def _validate_normalized_positions(positions: list[list[float]]) -> None:
     mins = [min(position[axis] for position in positions) for axis in range(3)]
     maxs = [max(position[axis] for position in positions) for axis in range(3)]
@@ -149,7 +133,6 @@ def validate_formation(value: Any) -> dict[str, Any]:
             point,
             path,
             required={"point_id", "group_id", "led_role", "position"},
-            optional={"default_led"},
         )
         point_ids.append(_identifier(point["point_id"], f"{path}.point_id"))
         _identifier(point["group_id"], f"{path}.group_id")
@@ -163,8 +146,6 @@ def validate_formation(value: Any) -> dict[str, Any]:
                 for axis, component in enumerate(raw_position)
             ]
         )
-        if "default_led" in point:
-            _validate_led(point["default_led"], f"{path}.default_led")
     if len(set(point_ids)) != len(point_ids):
         _fail("$.points", "point_id values must be unique")
     _validate_normalized_positions(positions)

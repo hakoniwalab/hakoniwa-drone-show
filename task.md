@@ -170,9 +170,11 @@ Formation authoring、Transition planning、256機対応などの新機能はTas
 - [x] position=`linear`、LED=`hold`の補間規則を定義する
 - [x] 時刻順かつ全機体割当済みの最小Show IRサンプルを追加する
 - [x] 箱庭runtimeに依存しないvalidatorと意味制約テストを追加する
-- [x] Formation JSONの責務、正規化座標、point/group ID、LED role、任意の既定LEDをSchema化する
+- [x] Formation JSONの責務、正規化座標、point/group ID、LED roleをSchema化する
+- [x] LED状態をFormationへ持たせずShow Planへ一本化する
 - [x] Formation JSONの最小サンプルとruntime非依存validatorを追加する
 - [x] SVGから指定機体数のFormation JSONを生成する
+- [x] SVG内の連続する同一点をzero-length segmentとして安全に除外する
 - [x] Show PlanのFormation参照、機体ID、時間、transform、steady LEDをSchema化する
 - [x] 現在の3 Formationと8秒移動・6秒holdを表すShow Planサンプルを追加する
 - [x] Formation、割当、移動時間、hold時間からShow IRをcompileする
