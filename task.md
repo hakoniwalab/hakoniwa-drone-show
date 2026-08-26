@@ -251,6 +251,7 @@ Formation authoring、Transition planning、256機対応などの新機能はTas
 - [ ] 点滅周期とduty ratioを指定できるようにする
 - [ ] 色・明るさの遷移時間を指定できるようにする
 - [ ] 全機共通、グループ単位、formation point単位の指定方法を定義する
+- [x] Show Fileで全pointのdefaultとFormationローカルなLED role別状態を指定できる
 - [ ] timelineを逐次時間で記述し、必要に応じて開始offsetを表現できるようにする
 - [ ] 時刻、周期、色、明るさ、対象機体の静的validationを定義する
 - [ ] 旧形式を読み込んだ場合の既定LED状態を定義する

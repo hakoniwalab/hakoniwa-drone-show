@@ -215,12 +215,19 @@ def _materialize_show_ir(*, recipe_config: Path, marker: dict[str, Any]) -> Path
     }
     timeline = []
     for source_step in definition["timeline"]:
+        source_led = source_step["led"]
+        led = {"default": source_led["default"]}
+        if source_led["roles"]:
+            led["roles"] = [
+                {"led_role": role, "state": state}
+                for role, state in source_led["roles"].items()
+            ]
         step = {
             "step_id": source_step["step_id"],
             "formation_id": resolved_formation_ids[source_step["formation_id"]],
             "transition_sec": source_step["transition_sec"],
             "hold_sec": source_step["hold_sec"],
-            "led": {"default": source_step["led"]},
+            "led": led,
         }
         timeline.append(step)
     first_step = definition["timeline"][0]

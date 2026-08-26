@@ -41,7 +41,12 @@
           "formation_id": { "$ref": "#/$defs/identifier" },
           "transition_sec": { "type": "number", "exclusiveMinimum": 0 },
           "hold_sec": { "type": "number", "minimum": 0 },
-          "led": { "$ref": "#/$defs/led" }
+          "led": {
+            "oneOf": [
+              { "$ref": "#/$defs/ledState" },
+              { "$ref": "#/$defs/ledPlan" }
+            ]
+          }
         }
       }
     }
@@ -51,7 +56,7 @@
       "type": "string",
       "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
     },
-    "led": {
+    "ledState": {
       "type": "object",
       "additionalProperties": false,
       "required": ["rgb", "brightness"],
@@ -68,6 +73,19 @@
           "maxItems": 3
         },
         "brightness": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "ledPlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["default"],
+      "properties": {
+        "default": { "$ref": "#/$defs/ledState" },
+        "roles": {
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/identifier" },
+          "additionalProperties": { "$ref": "#/$defs/ledState" }
+        }
       }
     }
   }

@@ -380,7 +380,18 @@ class ShowRuntimeTest(unittest.TestCase):
                             "formation_id": "alpha",
                             "transition_sec": 3.0,
                             "hold_sec": 4.0,
-                            "led": {"rgb": [4, 5, 6], "brightness": 1.0},
+                            "led": {
+                                "default": {
+                                    "rgb": [4, 5, 6],
+                                    "brightness": 1.0,
+                                },
+                                "roles": {
+                                    "eyes": {
+                                        "rgb": [7, 8, 9],
+                                        "brightness": 0.75,
+                                    }
+                                },
+                            },
                         },
                     ],
                 },
@@ -419,6 +430,24 @@ class ShowRuntimeTest(unittest.TestCase):
                 [step["led"]["default"]["rgb"] for step in plan["timeline"]],
                 [[1, 2, 3], [4, 5, 6]],
             )
+            self.assertEqual(
+                plan["timeline"][1]["led"]["roles"],
+                [
+                    {
+                        "led_role": "eyes",
+                        "state": {
+                            "effect": "steady",
+                            "rgb": [7, 8, 9],
+                            "brightness": 0.75,
+                        },
+                    }
+                ],
+            )
+            alpha_colors = {
+                tuple(state["led"]["rgb"])
+                for state in show_ir["timeline"][3]["states"]
+            }
+            self.assertEqual(alpha_colors, {(4, 5, 6), (7, 8, 9)})
 
 
 if __name__ == "__main__":

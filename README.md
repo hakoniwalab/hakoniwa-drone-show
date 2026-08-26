@@ -181,6 +181,10 @@ T-Rex、ロケット、UFOと宇宙人、AIロボットを順番に表示しま�
 [`shows/three-face.show.json`](shows/three-face.show.json)として残してあり、
 `scenario.show_file`を変更すれば切り替えられます。
 
+SVG要素の`data-led-role`とShow Fileの`led.roles`を組み合わせると、絵柄ごとに目、窓、
+炎などを色分けできます。role未指定部分には`led.default`が適用されます。詳細は
+[`docs/show-file-v1.md`](docs/show-file-v1.md#ledの色分け)を参照してください。
+
 ## Show toolchain v0.1
 
 Show toolchainは、次の4つの概念を扱います。

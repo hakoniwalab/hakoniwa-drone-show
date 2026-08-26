@@ -77,7 +77,7 @@ def _relative_path(value: Any, path: str) -> str:
     return value
 
 
-def _led(value: Any, path: str) -> dict[str, Any]:
+def _led_state(value: Any, path: str) -> dict[str, Any]:
     state = _object(value, path)
     _keys(state, path, required={"rgb", "brightness"}, optional={"effect"})
     effect = state.get("effect", "steady")
@@ -105,6 +105,28 @@ def _led(value: Any, path: str) -> dict[str, Any]:
         "effect": effect,
         "rgb": list(rgb),
         "brightness": float(brightness),
+    }
+
+
+def _led_plan(value: Any, path: str) -> dict[str, Any]:
+    plan = _object(value, path)
+    # v1 initially exposed a single LED state directly. Preserve that compact
+    # form as a default-only plan.
+    if "rgb" in plan or "brightness" in plan or "effect" in plan:
+        return {"default": _led_state(plan, path), "roles": {}}
+    _keys(plan, path, required={"default"}, optional={"roles"})
+    roles = plan.get("roles", {})
+    if not isinstance(roles, dict):
+        _fail(f"{path}.roles", "must be an object keyed by SVG led_role")
+    normalized_roles = {}
+    for role, state in roles.items():
+        role_id = _identifier(role, f"{path}.roles key")
+        normalized_roles[role_id] = _led_state(
+            state, f"{path}.roles.{role_id}"
+        )
+    return {
+        "default": _led_state(plan["default"], f"{path}.default"),
+        "roles": normalized_roles,
     }
 
 
@@ -197,7 +219,7 @@ def validate_show_file(value: Any) -> dict[str, Any]:
                     step["transition_sec"], f"{path}.transition_sec"
                 ),
                 "hold_sec": _non_negative(step["hold_sec"], f"{path}.hold_sec"),
-                "led": _led(step["led"], f"{path}.led"),
+                "led": _led_plan(step["led"], f"{path}.led"),
             }
         )
 
