@@ -121,6 +121,14 @@ scenario:
         self.assertIn("#three-root { width: 100%; height: 100%;", style)
         self.assertIn('id="camera-audience"', page)
         self.assertIn('id="camera-free"', page)
+        self.assertIn('id="camera-state"', page)
+        self.assertIn('id="camera-copy"', page)
+        self.assertIn("現在値（ENU）", page)
+        app = (recipe.SHOW_ROOT / "web" / "drone-show-app.mjs").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("getAudienceCameraState", app)
+        self.assertIn("audienceCameraYaml", app)
 
     def test_default_sources_use_sibling_repositories(self) -> None:
         self.assertEqual(

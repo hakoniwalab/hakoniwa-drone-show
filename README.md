@@ -130,6 +130,10 @@ Task 1対応Recipeでは、`start`しても自動的に離陸しません。`ope
 既存の汎用Map Viewer画面とICRA実行経路は変更せず、専用画面はRecipe生成物の
 `/drone-show/index.html`として追加されます。
 
+観客視点では現在のENU位置、yaw、pitch、FOVをサイドパネルへ表示します。調整後に
+`YAML設定をコピー`を押すと、City experimentへ貼り付ける`audience_camera`設定を
+クリップボードへコピーできます。
+
 専用画面はruntime用Show IRをHTTPで読み、Show Statusの`show_frame_index`に同期して
 機体ごとのRGBとbrightnessを表示します。現在のCityデモは3つのFormationを赤、緑、黄で
 順番に表示します。LED指定を行わない既存Viewerでは、従来の水色breathing表示がそのまま

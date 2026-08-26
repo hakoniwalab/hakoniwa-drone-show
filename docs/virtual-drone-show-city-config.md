@@ -82,7 +82,9 @@ ENU各軸のaxis-aligned bounding boxは、回転によってこの値より小�
 観客視点では、矢印キーで前後左右、`U`/`D`で上下へ移動します。`Shift`を
 押しながら移動すると高速になります。左ドラッグでyaw、右ドラッグでpitch、
 マウスホイールでFOVを調整します。調整内容はブラウザ内だけに保持され、YAMLは
-自動更新されません。確定した値はYAMLへ反映して`configure`を再実行してください。
+自動更新されません。観客視点のパネルには現在のENU位置、yaw、pitch、FOVが表示されます。
+`YAML設定をコピー`で`audience_camera`ブロックをコピーし、`viewer`の下へ反映してから
+`configure`を再実行してください。
 
 `viewer.led_appearance`はThree.js上の見え方だけを調整します。Show PlanのLED
 `brightness`（0〜1）は機体・フレーム別の演出値であり、こちらの設定では変更しません。

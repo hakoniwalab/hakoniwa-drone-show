@@ -1,4 +1,5 @@
 import { ShowControlClient } from './show-control-client.mjs';
+import { audienceCameraYaml, displayAudienceCameraState } from './audience-camera-config.mjs';
 import { ledStatesForFrame, rgbCss, validateShowIrForViewer } from './show-led-timeline.mjs';
 
 const ui = {
@@ -9,6 +10,15 @@ const ui = {
   cameraAudience: document.getElementById('camera-audience'),
   cameraFree: document.getElementById('camera-free'),
   cameraHelp: document.getElementById('camera-help'),
+  cameraState: document.getElementById('camera-state'),
+  cameraX: document.getElementById('camera-x'),
+  cameraY: document.getElementById('camera-y'),
+  cameraZ: document.getElementById('camera-z'),
+  cameraYaw: document.getElementById('camera-yaw'),
+  cameraPitch: document.getElementById('camera-pitch'),
+  cameraFov: document.getElementById('camera-fov'),
+  cameraCopy: document.getElementById('camera-copy'),
+  cameraCopyStatus: document.getElementById('camera-copy-status'),
 };
 
 let viewer = null;
@@ -25,6 +35,49 @@ let startPendingTimer = null;
 const markers = new Map();
 const ledStatesByDroneId = new Map();
 const START_RETRY_TIMEOUT_MSEC = 3000;
+let cameraCopyStatusTimer = null;
+
+function refreshAudienceCameraState() {
+  const state = viewer?.getAudienceCameraState?.();
+  const visible = state?.enabled === true;
+  ui.cameraState.hidden = !visible;
+  if (!visible) return null;
+  const display = displayAudienceCameraState(state);
+  ui.cameraX.textContent = display.x;
+  ui.cameraY.textContent = display.y;
+  ui.cameraZ.textContent = display.z;
+  ui.cameraYaw.textContent = display.yaw;
+  ui.cameraPitch.textContent = display.pitch;
+  ui.cameraFov.textContent = display.fov;
+  return state;
+}
+
+async function copyText(text) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.setAttribute('readonly', '');
+  textarea.style.position = 'fixed';
+  textarea.style.opacity = '0';
+  document.body.appendChild(textarea);
+  textarea.select();
+  const copied = document.execCommand('copy');
+  textarea.remove();
+  if (!copied) throw new Error('clipboard is unavailable');
+}
+
+function showCameraCopyStatus(message, failed = false) {
+  if (cameraCopyStatusTimer !== null) window.clearTimeout(cameraCopyStatusTimer);
+  ui.cameraCopyStatus.textContent = message;
+  ui.cameraCopyStatus.dataset.failed = String(failed);
+  cameraCopyStatusTimer = window.setTimeout(() => {
+    ui.cameraCopyStatus.textContent = '';
+    cameraCopyStatusTimer = null;
+  }, 2500);
+}
 
 function setCameraMode(mode) {
   if (!viewer) return false;
@@ -34,6 +87,7 @@ function setCameraMode(mode) {
   ui.cameraAudience.setAttribute('aria-pressed', String(audience));
   ui.cameraFree.setAttribute('aria-pressed', String(!audience));
   ui.cameraHelp.hidden = !audience;
+  refreshAudienceCameraState();
   return true;
 }
 
@@ -231,6 +285,7 @@ async function initialize() {
 
   window.setInterval(() => {
     if (!viewer) return;
+    refreshAudienceCameraState();
     const drones = viewer.getDrones();
     visibleDroneCount = drones.filter((drone) => drone.latestPose).length;
     ui.droneCount.textContent = `${visibleDroneCount} / ${expectedDroneCount}`;
@@ -277,9 +332,20 @@ ui.start.addEventListener('click', async () => {
 
 ui.cameraAudience.addEventListener('click', () => setCameraMode('audience'));
 ui.cameraFree.addEventListener('click', () => setCameraMode('free'));
+ui.cameraCopy.addEventListener('click', async () => {
+  const state = refreshAudienceCameraState();
+  if (!state) return;
+  try {
+    await copyText(audienceCameraYaml(state));
+    showCameraCopyStatus('コピーしました');
+  } catch (error) {
+    showCameraCopyStatus(`コピー失敗: ${error.message}`, true);
+  }
+});
 
 window.addEventListener('beforeunload', () => {
   clearStartPending();
+  if (cameraCopyStatusTimer !== null) window.clearTimeout(cameraCopyStatusTimer);
   controlClient?.stop();
 });
 initialize().catch((error) => setUiState('failed', error.message));

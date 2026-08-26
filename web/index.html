@@ -35,6 +35,19 @@
           <button id="camera-free" type="button" aria-pressed="false">自由視点</button>
         </div>
         <p id="camera-help" hidden>矢印: 前後左右 / U・D: 上下 / Shift: 高速<br>左ドラッグ: 横向き / 右ドラッグ: 仰角 / ホイール: 画角</p>
+        <div id="camera-state" hidden>
+          <p class="camera-coordinate-label">現在値（ENU）</p>
+          <dl class="camera-values">
+            <div><dt>X / East</dt><dd><span id="camera-x">0.00</span> m</dd></div>
+            <div><dt>Y / North</dt><dd><span id="camera-y">0.00</span> m</dd></div>
+            <div><dt>Z / Up</dt><dd><span id="camera-z">0.00</span> m</dd></div>
+            <div><dt>Yaw</dt><dd><span id="camera-yaw">0.00</span>°</dd></div>
+            <div><dt>Pitch</dt><dd><span id="camera-pitch">0.00</span>°</dd></div>
+            <div><dt>FOV</dt><dd><span id="camera-fov">0.00</span>°</dd></div>
+          </dl>
+          <button id="camera-copy" type="button">YAML設定をコピー</button>
+          <p id="camera-copy-status" role="status" aria-live="polite"></p>
+        </div>
       </section>
       <dl>
         <div><dt>表示中の機体</dt><dd id="drone-count">0 / 0</dd></div>
