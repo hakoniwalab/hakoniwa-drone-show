@@ -135,7 +135,7 @@ def generate_xml(scene, drone, count):
             (points[0]["x_m"] - points[1]["x_m"]) ** 2
             + (points[0]["y_m"] - points[1]["y_m"]) ** 2
         ) ** 0.5
-        self.assertGreaterEqual(separation, recipe.SPAWN_MIN_SEPARATION_M)
+        self.assertGreaterEqual(separation, recipe.SPAWN_DEFAULT_SEPARATION_M)
 
     def test_compact_spawn_formation_fits_64_drones_with_one_meter_spacing(self) -> None:
         points = recipe._select_safe_spawn_points(
@@ -160,14 +160,24 @@ def generate_xml(scene, drone, count):
                     1.0,
                 )
 
-    def test_spawn_spacing_is_bounded_before_selection(self) -> None:
+    def test_spawn_spacing_accepts_compact_positive_values(self) -> None:
+        points = recipe._select_safe_spawn_points(
+            drone_count=4,
+            half_extent_m={"north_south": 20.0, "east_west": 20.0},
+            terrain_height=lambda _x, _y: 0.0,
+            city_height=lambda _x, _y: 0.0,
+            spawn_spacing_m=0.5,
+        )
+        self.assertEqual(len(points), 4)
+
+    def test_spawn_spacing_rejects_zero(self) -> None:
         with self.assertRaisesRegex(recipe.FleetMujocoError, "finite value"):
             recipe._select_safe_spawn_points(
                 drone_count=1,
                 half_extent_m={"north_south": 20.0, "east_west": 20.0},
                 terrain_height=lambda _x, _y: 0.0,
                 city_height=lambda _x, _y: 0.0,
-                spawn_spacing_m=0.5,
+                spawn_spacing_m=0.0,
             )
 
     def test_formation_targets_are_resolved_in_city_local_frame(self) -> None:

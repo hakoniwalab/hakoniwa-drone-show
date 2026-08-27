@@ -75,7 +75,8 @@ MODEL_SIZE = {"nstack": "40000000", "nconmax": "500000"}
 DRONE_BODY_PATTERN = re.compile(r"d[1-9][0-9]*_b_drone_base")
 LANDING_GEAR_CLEARANCE_M = 0.20
 SPAWN_CLEARANCE_RADIUS_M = 0.75
-SPAWN_MIN_SEPARATION_M = 1.0
+SPAWN_DEFAULT_SEPARATION_M = 1.0
+SPAWN_MIN_SEPARATION_M = 0.0
 SPAWN_MAX_SEPARATION_M = 5.0
 SURFACE_MATCH_TOLERANCE_M = 0.15
 MAX_SPAWN_SLOPE_DELTA_M = 0.25
@@ -90,12 +91,12 @@ def _validate_spawn_spacing(spawn_spacing_m: float) -> float:
     value = float(spawn_spacing_m)
     if (
         not math.isfinite(value)
-        or value < SPAWN_MIN_SEPARATION_M
+        or value <= SPAWN_MIN_SEPARATION_M
         or value > SPAWN_MAX_SEPARATION_M
     ):
         raise FleetMujocoError(
             "spawn_spacing_m must be a finite value in "
-            f"[{SPAWN_MIN_SEPARATION_M}, {SPAWN_MAX_SEPARATION_M}]"
+            f"({SPAWN_MIN_SEPARATION_M}, {SPAWN_MAX_SEPARATION_M}]"
         )
     return value
 
@@ -217,7 +218,7 @@ def _sha256(path: Path) -> str:
 
 
 def _candidate_spawn_centers(
-    half_extent_m: dict[str, Any], *, spacing_m: float = SPAWN_MIN_SEPARATION_M
+    half_extent_m: dict[str, Any], *, spacing_m: float = SPAWN_DEFAULT_SEPARATION_M
 ) -> list[tuple[float, float]]:
     north_south = float(half_extent_m.get("north_south", 0.0))
     east_west = float(half_extent_m.get("east_west", 0.0))
@@ -272,7 +273,7 @@ def _select_safe_spawn_points(
     half_extent_m: dict[str, Any],
     terrain_height: Any,
     city_height: Any,
-    spawn_spacing_m: float = SPAWN_MIN_SEPARATION_M,
+    spawn_spacing_m: float = SPAWN_DEFAULT_SEPARATION_M,
 ) -> list[dict[str, float]]:
     spawn_spacing_m = _validate_spawn_spacing(spawn_spacing_m)
     selected: list[dict[str, float]] = []
@@ -972,7 +973,7 @@ def materialize_fleet_config(
     recipe_config: Path,
     model_receipt: dict[str, Any],
     spawn_altitude_m: float = LANDING_GEAR_CLEARANCE_M,
-    spawn_spacing_m: float = SPAWN_MIN_SEPARATION_M,
+    spawn_spacing_m: float = SPAWN_DEFAULT_SEPARATION_M,
     altitude_mode: str = "route-clearance",
     above_city_clearance_m: float = 10.0,
     formation_rotation_deg: float = 90.0,
@@ -1288,7 +1289,7 @@ def configure_single_host_fleet(
     drone_count: int,
     recipe_config: Path,
     spawn_altitude_m: float = LANDING_GEAR_CLEARANCE_M,
-    spawn_spacing_m: float = SPAWN_MIN_SEPARATION_M,
+    spawn_spacing_m: float = SPAWN_DEFAULT_SEPARATION_M,
     altitude_mode: str = "route-clearance",
     above_city_clearance_m: float = 10.0,
     process_count: int = 1,
@@ -1542,7 +1543,7 @@ def configure_single_host_flat_fleet(
     ground_height_m: float,
     flight_altitude_agl_m: float,
     spawn_altitude_m: float = LANDING_GEAR_CLEARANCE_M,
-    spawn_spacing_m: float = SPAWN_MIN_SEPARATION_M,
+    spawn_spacing_m: float = SPAWN_DEFAULT_SEPARATION_M,
     process_count: int = 1,
     formation_rotation_deg: float = 90.0,
     formation_tilt_deg: float = 15.0,
