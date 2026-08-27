@@ -107,10 +107,55 @@ export function manualWindCommand({
   };
 }
 
+export function liveWindCommand({
+  publisherId,
+  sequence,
+  provider = 'open-meteo',
+  validAt,
+  vectorRosMS,
+  speedStddevMps = 0,
+  variationSeed = 1,
+}) {
+  if (typeof publisherId !== 'string' || publisherId.length < 1) {
+    throw new Error('publisherId is required');
+  }
+  if (!Number.isSafeInteger(sequence) || sequence < 1) {
+    throw new Error('sequence must be a positive safe integer');
+  }
+  if (typeof provider !== 'string' || provider.length < 1) {
+    throw new Error('provider is required');
+  }
+  if (typeof validAt !== 'string' || validAt.length < 1) {
+    throw new Error('validAt is required');
+  }
+  if (!Array.isArray(vectorRosMS) || vectorRosMS.length !== 3
+      || vectorRosMS.some((value) => !Number.isFinite(value))) {
+    throw new Error('vectorRosMS must contain three finite numbers');
+  }
+  const stddev = clampWindSpeedMps(speedStddevMps, MAX_WIND_STDDEV_M_S);
+  const seed = Number(variationSeed);
+  if (!Number.isSafeInteger(seed) || seed < 0) {
+    throw new Error('variationSeed must be a non-negative safe integer');
+  }
+  return {
+    schema: GLOBAL_WIND_SCHEMA,
+    publisher_id: publisherId,
+    sequence,
+    source: { mode: 'live', provider, observed_at: validAt },
+    wind: {
+      enabled: true,
+      vector_ros_m_s: vectorRosMS.map((value) => zeroClean(Math.round(value * 1000) / 1000)),
+      variation: { speed_stddev_m_s: stddev, seed },
+    },
+  };
+}
+
 export function physicalWindKey(command) {
   if (!command.wind.enabled) return JSON.stringify([false, [0, 0, 0]]);
   return JSON.stringify([
     true,
+    command.source.mode,
+    command.source.provider,
     command.wind.vector_ros_m_s,
     command.wind.variation.speed_stddev_m_s,
     command.wind.variation.seed,

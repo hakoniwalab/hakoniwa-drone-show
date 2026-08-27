@@ -13,6 +13,20 @@ runtime:
   visualization: true
   show_runner_real_time_sync: true
 
+global_wind:
+  enabled: true
+  initial_mode: manual
+  manual:
+    enabled: false
+    speed_m_s: 0.0
+    direction_to_deg: 0.0
+    speed_stddev_m_s: 0.0
+  live:
+    provider: open-meteo
+    poll_interval_sec: 300
+    timeout_sec: 5
+    stale_after_sec: 900
+
 environment:
   mode: plateau
   plateau:
@@ -71,7 +85,7 @@ viewer:
     center_m: [0.0, -34.0]
     width_m: 44.0
     depth_m: 16.0
-    ground_height_m: 33.26
+    ground_height_m: 33.0
     lighting:
       enabled: true
       intensity: 140.0

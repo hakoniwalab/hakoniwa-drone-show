@@ -437,6 +437,23 @@ class ShowRuntimeTest(unittest.TestCase):
                 {"initial_mode": "audience", "audience_available": True},
             )
             self.assertEqual(
+                runtime["global_wind"]["venue"],
+                {
+                    "latitude": 35.0,
+                    "longitude": 138.0,
+                    "source": "plateau-city-world",
+                },
+            )
+            self.assertEqual(
+                runtime["global_wind"]["live"],
+                {
+                    "provider": "open-meteo",
+                    "poll_interval_sec": 300.0,
+                    "timeout_sec": 5.0,
+                    "stale_after_sec": 900.0,
+                },
+            )
+            self.assertEqual(
                 runtime["city_lighting"],
                 {
                     "enabled": True,

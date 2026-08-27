@@ -337,6 +337,11 @@ scenario:
         )
         self.assertNotIn("viewer", compatible)
         self.assertNotIn("ar", compatible)
+        self.assertNotIn("global_wind", compatible)
+        global_wind = recipe._global_wind_settings(recipe.DEFAULT_EXPERIMENT)
+        self.assertEqual(global_wind["initial_mode"], "manual")
+        self.assertEqual(global_wind["live"]["provider"], "open-meteo")
+        self.assertEqual(global_wind["live"]["poll_interval_sec"], 300.0)
         ar = recipe._ar_settings(recipe.DEFAULT_EXPERIMENT)
         self.assertFalse(ar["enabled"])
 
@@ -621,7 +626,7 @@ scenario:
                 "center_m": [0.0, -34.0],
                 "width_m": 44.0,
                 "depth_m": 16.0,
-                "ground_height_m": 33.26,
+                "ground_height_m": 33.0,
                 "lighting": {
                     "enabled": True,
                     "intensity": 140.0,
@@ -833,6 +838,22 @@ scenario:
                         "network": {"host": "192.168.1.23"},
                     },
                     "ar": {"enabled": False},
+                    "global_wind": {
+                        "enabled": True,
+                        "initial_mode": "manual",
+                        "manual": {
+                            "enabled": False,
+                            "speed_m_s": 0.0,
+                            "direction_to_deg": 0.0,
+                            "speed_stddev_m_s": 0.0,
+                        },
+                        "live": {
+                            "provider": "open-meteo",
+                            "poll_interval_sec": 300.0,
+                            "timeout_sec": 5.0,
+                            "stale_after_sec": 900.0,
+                        },
+                    },
                     "show_definition": {
                         "path": str(
                             recipe.SHOW_ROOT / "shows" / "three-face.show.json"

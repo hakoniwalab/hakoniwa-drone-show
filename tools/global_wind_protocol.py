@@ -214,7 +214,7 @@ class GlobalWindReceiverState:
 
         key = physical_state_key(normalized)
         changed = key != self.current_key
+        self.current_message = normalized
         if changed:
             self.current_key = key
-            self.current_message = normalized
         return normalized, changed

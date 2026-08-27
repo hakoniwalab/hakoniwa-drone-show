@@ -166,7 +166,7 @@ The provider adapter SHALL build the request with these parameters:
 | `current` | `wind_speed_10m,wind_direction_10m,wind_gusts_10m` | minimum required wind fields |
 | `wind_speed_unit` | `ms` | avoid km/h conversion in Hakoniwa |
 | `timeformat` | `unixtime` | avoid local-time parsing ambiguity |
-| `models` | `auto` | let Open-Meteo select/combine the suitable model |
+| `models` | omitted | omission selects the documented default/best-match model; the current API rejects explicit `models=auto` |
 | `cell_selection` | `land` | PLATEAU venue is a land location |
 
 Example conceptual request:
@@ -178,7 +178,6 @@ GET /v1/forecast
     &current=wind_speed_10m,wind_direction_10m,wind_gusts_10m
     &wind_speed_unit=ms
     &timeformat=unixtime
-    &models=auto
     &cell_selection=land
 ```
 
@@ -360,13 +359,14 @@ Examples:
 270° : wind from West
 ```
 
-This is the same semantic used by the Global Wind UI field:
+Open-Meteoの取得値とLive詳細表示では、このFROM方位を保持する。一方、Manual操作と
+共通コンパスは、ユーザーが直感的に操作できるよう、風が実際に流れるTO方位を使う:
 
 ```text
-direction_from_deg
+direction_to_deg = (direction_from_deg + 180) % 360
 ```
 
-Therefore no semantic inversion is necessary for the display value.
+Live取得時はFROMとTOを併記し、コンパスの矢印はTOへ自動設定する。
 
 ### 7.2 Conversion to ENU physical vector
 
@@ -559,15 +559,15 @@ Recommended Live command:
   "source": {
     "mode": "live",
     "provider": "open-meteo",
-    "data_type": "forecast-model-current",
-    "valid_at": "2026-08-28T00:00:00.000Z"
+    "observed_at": "2026-08-28T00:00:00.000Z"
   },
   "wind": {
     "enabled": true,
-    "vector_enu_m_s": [-0.989, -3.043, 0.0],
-    "speed_m_s": 3.2,
-    "direction_from_deg": 18.0,
-    "gust_m_s": 5.8
+    "vector_ros_m_s": [-3.043, 0.989, 0.0],
+    "variation": {
+      "speed_stddev_m_s": 0.0,
+      "seed": 1
+    }
   }
 }
 ```
@@ -576,21 +576,23 @@ Normative physical truth:
 
 ```text
 wind.enabled
-wind.vector_enu_m_s
+wind.vector_ros_m_s
+wind.variation
 ```
 
-Display/audit fields:
+Display fields retained in the browser-side provider result (not duplicated into the PDU):
 
 ```text
-wind.speed_m_s
-wind.direction_from_deg
-wind.gust_m_s
-source.*
+speed_m_s
+direction_from_deg / direction_to_deg
+gust_m_s
+valid_at / fetched_at
 ```
 
-The receiver MUST use `vector_enu_m_s` for physics.
+Provider内部では標準ENUベクトルを保持できるが、既存Global Wind v1へ送る時点でDrone PDUの
+ROS座標へ変換する。receiverは`vector_ros_m_s`を物理入力として使用する。
 
-It MUST NOT reconstruct the physical vector from `speed_m_s` and `direction_from_deg`.
+The receiver MUST NOT reconstruct the physical vector from browser display metadata.
 
 ---
 
@@ -816,7 +818,8 @@ Recommended comparison fields:
 source.mode
 source.provider
 wind.enabled
-normalized vector_enu_m_s
+normalized vector_ros_m_s
+wind.variation
 ```
 
 Do not include:
@@ -984,17 +987,17 @@ Global Wind SHOULD follow the same structural convention.
 
 Use a distinct magic so a wind frame can never be mistaken for a Show Control frame.
 
-Example proposal:
+Current implementation:
 
 ```text
-HGW1
+HDW1
 ```
 
 Frame:
 
 | offset | size | content |
 |---:|---:|---|
-| 0 | 4 | ASCII `HGW1` |
+| 0 | 4 | ASCII `HDW1` |
 | 4 | 2 | JSON byte length, big-endian uint16 |
 | 6 | 2 | flags = 0 |
 | 8 | 0..1016 | UTF-8 JSON |
@@ -1049,20 +1052,19 @@ source.provider:
 wind.enabled:
     boolean
 
-wind.vector_enu_m_s:
+wind.vector_ros_m_s:
     exactly 3 finite numbers
     reasonable configured range
 
-wind.speed_m_s:
+wind.variation.speed_stddev_m_s:
     finite and >= 0
 
-wind.direction_from_deg:
-    finite and [0, 360)
-
-wind.gust_m_s:
-    optional
-    finite and >= 0
+wind.variation.seed:
+    non-negative safe integer
 ```
+
+平均風速、FROM/TO方位、gust、valid/fetched timeはブラウザのprovider状態として保持し、
+strictな物理PDUへ重複して格納しない。
 
 Unknown fields SHOULD be rejected in v1 if the rest of the Show protocols follow strict schemas.
 
@@ -1316,8 +1318,8 @@ Recommended generated config:
     "manual": {
       "enabled": false,
       "speed_m_s": 0.0,
-      "direction_from_deg": 0.0,
-      "up_m_s": 0.0
+      "direction_to_deg": 0.0,
+      "speed_stddev_m_s": 0.0
     },
     "live": {
       "provider": "open-meteo",
@@ -1352,8 +1354,8 @@ global_wind:
   manual:
     enabled: false
     speed_m_s: 0.0
-    direction_from_deg: 0.0
-    up_m_s: 0.0
+    direction_to_deg: 0.0
+    speed_stddev_m_s: 0.0
 
   live:
     provider: open-meteo
@@ -1393,7 +1395,7 @@ Verify exact semantic parameters:
 current has all 3 wind variables
 wind_speed_unit == ms
 timeformat == unixtime
-models == auto
+models is omitted so the provider default/best match is used
 cell_selection == land
 ```
 

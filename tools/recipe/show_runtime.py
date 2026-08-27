@@ -727,6 +727,34 @@ def materialize_browser(
             "robot_name": wind_protocol.ROBOT_NAME,
             "command_pdu_name": wind_protocol.COMMAND_PDU_NAME,
             "frame_size": wind_protocol.FRAME_SIZE,
+            **show_config.get(
+                "global_wind",
+                {
+                    "enabled": True,
+                    "initial_mode": "manual",
+                    "manual": {
+                        "enabled": False,
+                        "speed_m_s": 0.0,
+                        "direction_to_deg": 0.0,
+                        "speed_stddev_m_s": 0.0,
+                    },
+                    "live": {
+                        "provider": "open-meteo",
+                        "poll_interval_sec": 300.0,
+                        "timeout_sec": 5.0,
+                        "stale_after_sec": 900.0,
+                    },
+                },
+            ),
+            "venue": {
+                "latitude": float(origin["latitude"]),
+                "longitude": float(origin["longitude"]),
+                "source": (
+                    "plateau-city-world"
+                    if marker.get("backend") == "mujoco-city"
+                    else "flat-world-origin"
+                ),
+            },
         },
     }
     _write_json(destination / "runtime-config.json", runtime_config)

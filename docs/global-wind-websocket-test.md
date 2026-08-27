@@ -37,6 +37,19 @@ python tools/recipe/virtual_drone_show.py open-viewer
 6. 風向の数値欄で同じ値を再確定し、`変更なし（未送信）`になることを確認する
 7. 風をOFFにしてzero vectorを送信する
 
+### Live weather
+
+1. `Live`を選ぶと、configureで解決した会場座標についてOpen-Meteoを即時取得する
+2. 気象風向（from）と流れる方向（to）が180°反対で、コンパスがto方向を向くことを確認する
+3. `Open-Meteoで確認`を開き、同じ緯度経度の取得元JSONを確認する
+4. `最新値を取得`を押し、5分間隔を待たず取得できることを確認する
+5. 同じ物理値なら「物理値は変更なし」と表示され、Global Wind Commandを再送しない
+6. 標準偏差を変更すると、現在のLive平均風に対する新しいcommandを1回送信する
+7. `手動`へ戻ると、直前のManual設定を再適用する
+
+Liveのgustは参考表示だけで、物理風速や標準偏差へ自動適用しません。取得失敗時は直前に
+適用できた風を維持し、zero vectorを送信しません。
+
 Launcherが起動した`global-wind-asset`のログには、初期化とSHM callbackの処理結果が出ます。
 
 ```text

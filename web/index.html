@@ -99,6 +99,10 @@
       <details id="global-wind-panel">
         <summary>風を操作</summary>
         <div class="wind-controls">
+          <div class="wind-mode" role="group" aria-label="風入力モード">
+            <button id="wind-mode-manual" type="button" data-active="true">手動</button>
+            <button id="wind-mode-live" type="button">Live</button>
+          </div>
           <p class="wind-help">矢印を、風を流したい方向へ向けます（Nなら北へ、Eなら東へ流れます）。変更時だけ全体風コマンドを送信します。</p>
           <label class="wind-enable"><input id="wind-enabled" type="checkbox">風を有効にする</label>
           <div id="wind-compass" class="wind-compass" aria-label="風向コンパス">
@@ -119,6 +123,25 @@
           <p class="wind-help">標準偏差0では全機が同じ風速です。ばらつきを増やしても風向は変わらず、逆方向には流れません。</p>
           <p id="wind-vector" class="wind-vector">[0.00, 0.00, 0.00] ROS m/s</p>
           <p id="wind-status" class="wind-status" role="status" aria-live="polite">通信準備中</p>
+          <section id="live-wind-info" class="live-wind-info" hidden>
+            <dl>
+              <div><dt>Provider</dt><dd>Open-Meteo</dd></div>
+              <div><dt>状態</dt><dd id="live-wind-status">待機中</dd></div>
+              <div><dt>会場</dt><dd id="live-wind-venue">--</dd></div>
+              <div><dt>平均風速</dt><dd id="live-wind-speed">--</dd></div>
+              <div><dt>気象風向</dt><dd id="live-wind-from">--</dd></div>
+              <div><dt>流れる方向</dt><dd id="live-wind-to">--</dd></div>
+              <div><dt>Gust（参考）</dt><dd id="live-wind-gust">--</dd></div>
+              <div><dt>データ時刻</dt><dd id="live-wind-valid-at">--</dd></div>
+              <div><dt>取得時刻</dt><dd id="live-wind-fetched-at">--</dd></div>
+            </dl>
+            <div class="live-wind-actions">
+              <button id="live-wind-refresh" type="button">最新値を取得</button>
+              <a id="live-wind-source" href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer">Open-Meteoで確認</a>
+            </div>
+            <p class="wind-help">Open-Meteoの気象モデル値です。実飛行や安全判断には使用できません。</p>
+            <p class="wind-help">Weather data: <a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer">Open-Meteo</a></p>
+          </section>
         </div>
       </details>
       <dl>

@@ -133,6 +133,9 @@ h1 { margin: 0 0 24px; font-size: 25px; line-height: 1.15; }
 }
 #global-wind-panel summary { color: #bdeefa; font-size: 11px; cursor: pointer; }
 .wind-controls { display: grid; gap: 9px; margin-top: 10px; }
+.wind-mode { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.wind-mode button { border: 1px solid #304568; border-radius: 7px; padding: 7px; color: #91a2bd; background: #111a2b; cursor: pointer; }
+.wind-mode button[data-active="true"] { border-color: #67e8f9; color: #07111f; background: #67e8f9; }
 .wind-help { margin: 0; color: #718198; font-size: 10px; line-height: 1.5; }
 .wind-enable, .wind-direction { display: flex; align-items: center; justify-content: space-between; color: #91a2bd; font-size: 10px; }
 .wind-direction input { width: 58px; padding: 4px; border: 1px solid #304568; border-radius: 5px; color: #e5eefc; background: #111a2b; text-align: right; }
@@ -169,6 +172,15 @@ h1 { margin: 0 0 24px; font-size: 25px; line-height: 1.15; }
 .wind-vector, .wind-status { margin: 0; color: #91a2bd; font-size: 10px; text-align: center; font-variant-numeric: tabular-nums; }
 .wind-status { min-height: 1.2em; color: #67e8f9; }
 .wind-status[data-failed="true"] { color: #fb7185; }
+.live-wind-info { padding: 8px; border: 1px solid #263653; border-radius: 8px; background: #0a1322; }
+.live-wind-info dl { margin: 0 0 8px; }
+.live-wind-info dl div { padding: 4px 0; }
+.live-wind-info dt, .live-wind-info dd { font-size: 9px; }
+.live-wind-info dd { max-width: 62%; overflow-wrap: anywhere; text-align: right; }
+.live-wind-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; align-items: stretch; }
+.live-wind-actions button, .live-wind-actions a { display: grid; place-items: center; min-height: 30px; padding: 5px; border: 1px solid #304568; border-radius: 6px; color: #bdeefa; background: #111a2b; font-size: 9px; text-align: center; text-decoration: none; cursor: pointer; }
+.live-wind-actions button:disabled { opacity: .45; cursor: wait; }
+.wind-controls[data-mode="live"] .wind-compass { cursor: default; }
 dl { margin: 22px 0; }
 dl div { display: flex; justify-content: space-between; padding: 9px 0; border-bottom: 1px solid #263653; }
 dt { color: #91a2bd; font-size: 12px; }

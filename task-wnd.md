@@ -140,18 +140,19 @@ zero vectorは風機能が有効な無風条件を表す。この違いはUI、�
 
 UI操作中も同じ値を連続送信せず、確定値が変わった場合だけsequenceを増やして送る。
 
-### Live weather（第二弾）
+### Live weather
 
 無料で利用可能な公開気象データから、会場の緯度経度に対応する最新風を取得する。
 ブラウザ側にprovider adapterを置き、取得値をManualと同じGlobal Wind JSONへ正規化する。
 
-- provider、利用規約、ライセンス、帰属表示、レート制限を調査して選定する
-- CORS、API key秘匿、障害時fallbackを確認する
-- UIの表示更新周期と外部APIの取得周期を分離する
-- 秒単位で画面を更新しても、外部APIを毎秒呼ばない
-- 観測値が変化した場合だけGlobal Wind Commandを送る
-- 取得失敗時に直前値を維持するかManualへ戻すかを明示する
-- 観測地点、高度、観測時刻、予報値か実況値かを画面に表示する
+- [x] Open-Meteoをproviderとして、利用条件・帰属表示・rate limitを確認する
+- [x] API keyを使わず、timeoutと障害時の直前値維持を実装する
+- [x] UI表示、5分poll、Hakoniwa仮想時刻を分離する
+- [x] 値が変化した場合だけGlobal Wind Commandを送る
+- [x] Manual／Liveを再起動なしで切り替える
+- [x] 会場、平均風速、from/to方位、gust、データ時刻、取得時刻を表示する
+- [x] 即時更新ボタンと取得元APIリンクを表示する
+- [x] Liveでも機体ごとの標準偏差を変更できる
 
 外部APIのレスポンスやデータを本リポジトリへ恒久保存・再配布する場合は、別途ライセンスを
 確認する。

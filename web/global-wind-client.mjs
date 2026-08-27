@@ -4,6 +4,7 @@ import {
   createPublisherId,
   encodeFrame,
   manualWindCommand,
+  liveWindCommand,
   physicalWindKey,
 } from './global-wind-protocol.mjs';
 
@@ -33,6 +34,22 @@ export class GlobalWindClient {
       speedMps,
       speedStddevMps,
     });
+    return this.#send(command);
+  }
+
+  async sendLive({ provider, validAt, vectorRosMS, speedStddevMps }) {
+    const command = liveWindCommand({
+      publisherId: this.publisherId,
+      sequence: this.sequence + 1,
+      provider,
+      validAt,
+      vectorRosMS,
+      speedStddevMps,
+    });
+    return this.#send(command);
+  }
+
+  async #send(command) {
     const key = physicalWindKey(command);
     if (key === this.lastPhysicalKey) return { sent: false, command };
     const sent = await this.manager.flush_pdu_raw_data(

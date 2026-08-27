@@ -608,6 +608,98 @@ def _max_speed_m_s(experiment_path: Path) -> float:
     return float(value)
 
 
+def _global_wind_settings(experiment_path: Path) -> dict:
+    raw = _BASE_LOAD_SIMPLE_YAML(experiment_path)
+    value = raw.get("global_wind", {})
+    if not isinstance(value, dict):
+        raise base.RecipeError("global_wind must be a mapping")
+    unknown = sorted(set(value) - {"enabled", "initial_mode", "manual", "live"})
+    if unknown:
+        raise base.RecipeError("global_wind has unknown fields: " + ", ".join(unknown))
+    enabled = value.get("enabled", True)
+    if not isinstance(enabled, bool):
+        raise base.RecipeError("global_wind.enabled must be boolean")
+    initial_mode = value.get("initial_mode", "manual")
+    if initial_mode not in {"manual", "live"}:
+        raise base.RecipeError("global_wind.initial_mode must be manual or live")
+
+    manual = value.get("manual", {})
+    if not isinstance(manual, dict):
+        raise base.RecipeError("global_wind.manual must be a mapping")
+    unknown_manual = sorted(
+        set(manual)
+        - {"enabled", "speed_m_s", "direction_to_deg", "speed_stddev_m_s"}
+    )
+    if unknown_manual:
+        raise base.RecipeError(
+            "global_wind.manual has unknown fields: " + ", ".join(unknown_manual)
+        )
+    manual_enabled = manual.get("enabled", False)
+    if not isinstance(manual_enabled, bool):
+        raise base.RecipeError("global_wind.manual.enabled must be boolean")
+
+    def finite_range(mapping, key, default, minimum, maximum, prefix):
+        item = mapping.get(key, default)
+        if (
+            not isinstance(item, (int, float))
+            or isinstance(item, bool)
+            or not math.isfinite(float(item))
+            or not minimum <= float(item) <= maximum
+        ):
+            raise base.RecipeError(
+                f"{prefix}.{key} must be within [{minimum}, {maximum}]"
+            )
+        return float(item)
+
+    resolved_manual = {
+        "enabled": manual_enabled,
+        "speed_m_s": finite_range(
+            manual, "speed_m_s", 0.0, 0.0, 30.0, "global_wind.manual"
+        ),
+        "direction_to_deg": finite_range(
+            manual, "direction_to_deg", 0.0, 0.0, 359.0, "global_wind.manual"
+        ),
+        "speed_stddev_m_s": finite_range(
+            manual, "speed_stddev_m_s", 0.0, 0.0, 15.0, "global_wind.manual"
+        ),
+    }
+
+    live = value.get("live", {})
+    if not isinstance(live, dict):
+        raise base.RecipeError("global_wind.live must be a mapping")
+    unknown_live = sorted(
+        set(live) - {"provider", "poll_interval_sec", "timeout_sec", "stale_after_sec"}
+    )
+    if unknown_live:
+        raise base.RecipeError(
+            "global_wind.live has unknown fields: " + ", ".join(unknown_live)
+        )
+    provider = live.get("provider", "open-meteo")
+    if provider != "open-meteo":
+        raise base.RecipeError("global_wind.live.provider must be open-meteo")
+    poll_interval_sec = finite_range(
+        live, "poll_interval_sec", 300.0, 60.0, 86400.0, "global_wind.live"
+    )
+    timeout_sec = finite_range(
+        live, "timeout_sec", 5.0, 1.0, 30.0, "global_wind.live"
+    )
+    stale_after_sec = finite_range(
+        live, "stale_after_sec", 900.0, poll_interval_sec, 86400.0,
+        "global_wind.live",
+    )
+    return {
+        "enabled": enabled,
+        "initial_mode": initial_mode,
+        "manual": resolved_manual,
+        "live": {
+            "provider": provider,
+            "poll_interval_sec": poll_interval_sec,
+            "timeout_sec": timeout_sec,
+            "stale_after_sec": stale_after_sec,
+        },
+    }
+
+
 def _viewer_settings(experiment_path: Path) -> dict:
     raw = _BASE_LOAD_SIMPLE_YAML(experiment_path)
     viewer = raw.get("viewer")
@@ -1168,6 +1260,7 @@ def _load_base_compatible_experiment(path: Path):
     raw = _BASE_LOAD_SIMPLE_YAML(path)
     _environment_settings(path)
     _ar_settings(path)
+    _global_wind_settings(path)
     viewer = raw.get("viewer")
     if viewer is not None:
         _viewer_settings(path)
@@ -1177,6 +1270,7 @@ def _load_base_compatible_experiment(path: Path):
         compatible.pop("viewer", None)
         compatible.pop("environment", None)
         compatible.pop("ar", None)
+        compatible.pop("global_wind", None)
         return compatible
     formation_scale_m = _formation_scale_m(path)
     _formation_depth_m(path)
@@ -1196,6 +1290,7 @@ def _load_base_compatible_experiment(path: Path):
     compatible.pop("viewer", None)
     compatible.pop("environment", None)
     compatible.pop("ar", None)
+    compatible.pop("global_wind", None)
     compatible_scenario = compatible["scenario"]
     del compatible_scenario["formation"]
     del compatible_scenario["max_speed_m_s"]
@@ -1476,6 +1571,7 @@ def configure(args: argparse.Namespace, experiment_path: Path, drone_root: Path)
     show_definition_path, show_definition = _show_definition(experiment_path)
     viewer_settings = _viewer_settings(experiment_path)
     ar_settings = _ar_settings(experiment_path)
+    global_wind_settings = _global_wind_settings(experiment_path)
     rc = base.configure(
         experiment_path,
         drone_root,
@@ -1534,6 +1630,7 @@ def configure(args: argparse.Namespace, experiment_path: Path, drone_root: Path)
         "max_speed_m_s": experiment.speed_m_s,
         "viewer": viewer_settings,
         "ar": ar_settings,
+        "global_wind": global_wind_settings,
         "show_definition": {
             "path": str(show_definition_path),
             "sha256": hashlib.sha256(show_definition_path.read_bytes()).hexdigest(),

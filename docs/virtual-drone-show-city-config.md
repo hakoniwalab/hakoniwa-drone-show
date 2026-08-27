@@ -115,6 +115,27 @@ Formation、Show IR、
 | `runtime.visualization` | 真偽値 | VSP、WebBridge、HTTP ViewerをLauncherへ含めます。ブラウザ開始型のShowでは`true`が必須です。 |
 | `runtime.show_runner_real_time_sync` | 真偽値 | Show Runnerの進行をwall-clock時間へ同期します。観賞用Showでは通常`true`にします。 |
 
+### `global_wind`
+
+| 項目 | 型・制約 | 説明 |
+|---|---|---|
+| `global_wind.enabled` | 真偽値 | Global Wind Assetとブラウザ風操作を有効にします。 |
+| `global_wind.initial_mode` | `manual`または`live` | Viewer起動時の風入力モードです。 |
+| `global_wind.manual.enabled` | 真偽値 | Manualモードの初期風有効状態です。 |
+| `global_wind.manual.speed_m_s` | 0〜30 | Manualモードの初期平均風速です。 |
+| `global_wind.manual.direction_to_deg` | 0〜359 | 風が実際に流れる方位です。0°=北、90°=東です。 |
+| `global_wind.manual.speed_stddev_m_s` | 0〜15 | 機体ごとの風速標準偏差です。0なら全機同速です。 |
+| `global_wind.live.provider` | `open-meteo` | Live weather providerです。 |
+| `global_wind.live.poll_interval_sec` | 60〜86400 | 自動取得間隔です。既定は300秒です。 |
+| `global_wind.live.timeout_sec` | 1〜30 | HTTP取得timeoutです。 |
+| `global_wind.live.stale_after_sec` | poll間隔以上86400以下 | 最終成功値をSTALE表示へ切り替える時間です。 |
+
+Liveモードでは、会場座標をPLATEAU City Worldのorigin（flatではflat origin）から
+`configure`時に解決します。Open-Meteoの気象風向（from）を、実際に流れる方向（to）へ
+自動変換してコンパスへ表示します。平均風速と方向はprovider値ですが、標準偏差はブラウザで
+引き続き調整できます。`最新値を取得`は5分間隔を待たず即時取得し、同じ物理値ならPDUを
+再送しません。`Open-Meteoで確認`は、その取得に使うAPI URLを別タブで開きます。
+
 ### `environment`
 
 | 項目 | 型・制約 | 説明 |

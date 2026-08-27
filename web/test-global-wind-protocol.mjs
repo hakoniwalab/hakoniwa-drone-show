@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {
   manualWindCommand,
+  liveWindCommand,
   meteorologicalWindToRos,
   flowDirectionToRos,
   normalizeDirectionFromDeg,
@@ -41,5 +42,13 @@ assert.notEqual(physicalWindKey(enabled), physicalWindKey(disabled));
 const frame = encodeFrame(enabled);
 assert.equal(frame.byteLength, 1024);
 assert.deepEqual(decodeFrame(frame), enabled);
+
+const live = liveWindCommand({
+  publisherId: 'browser-test', sequence: 3, provider: 'open-meteo',
+  validAt: '2026-08-28T00:00:00.000Z', vectorRosMS: [-1.23456, 2.34567, 0],
+  speedStddevMps: 0.5,
+});
+assert.deepEqual(live.wind.vector_ros_m_s, [-1.235, 2.346, 0]);
+assert.notEqual(physicalWindKey(enabled), physicalWindKey(live));
 
 console.log('global-wind-protocol: ok');

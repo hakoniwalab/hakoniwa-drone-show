@@ -6,6 +6,8 @@ import { createAudienceCrowd } from './audience-crowd.mjs';
 import { cityLightingYaml, createCityLighting, normalizeCityLighting } from './city-lighting.mjs';
 import { GlobalWindClient } from './global-wind-client.mjs';
 import { flowDirectionToRos, normalizeDirectionFromDeg } from './global-wind-protocol.mjs';
+import { GlobalWindLiveController } from './global-wind-live-controller.mjs';
+import { OpenMeteoProvider } from './open-meteo-provider.mjs';
 import { cameraHeadingDisplay } from './camera-heading.mjs';
 
 const ui = {
@@ -48,6 +50,9 @@ const ui = {
   lightingCopy: document.getElementById('lighting-copy'),
   lightingCopyStatus: document.getElementById('lighting-copy-status'),
   windPanel: document.getElementById('global-wind-panel'),
+  windControls: document.querySelector('#global-wind-panel .wind-controls'),
+  windModeManual: document.getElementById('wind-mode-manual'),
+  windModeLive: document.getElementById('wind-mode-live'),
   windEnabled: document.getElementById('wind-enabled'),
   windCompass: document.getElementById('wind-compass'),
   windPointer: document.getElementById('wind-pointer'),
@@ -58,11 +63,25 @@ const ui = {
   windSpeedStddevValue: document.getElementById('wind-speed-stddev-value'),
   windVector: document.getElementById('wind-vector'),
   windStatus: document.getElementById('wind-status'),
+  liveWindInfo: document.getElementById('live-wind-info'),
+  liveWindStatus: document.getElementById('live-wind-status'),
+  liveWindVenue: document.getElementById('live-wind-venue'),
+  liveWindSpeed: document.getElementById('live-wind-speed'),
+  liveWindFrom: document.getElementById('live-wind-from'),
+  liveWindTo: document.getElementById('live-wind-to'),
+  liveWindGust: document.getElementById('live-wind-gust'),
+  liveWindValidAt: document.getElementById('live-wind-valid-at'),
+  liveWindFetchedAt: document.getElementById('live-wind-fetched-at'),
+  liveWindRefresh: document.getElementById('live-wind-refresh'),
+  liveWindSource: document.getElementById('live-wind-source'),
 };
 
 let viewer = null;
 let controlClient = null;
 let globalWindClient = null;
+let globalWindLiveController = null;
+let windMode = 'manual';
+let manualWindDraft = { enabled: false, directionToDeg: 0, speedMps: 0 };
 let latestStatus = null;
 let expectedDroneCount = 0;
 let visibleDroneCount = 0;
@@ -109,6 +128,7 @@ function refreshManualWindDisplay() {
 
 async function sendManualWind() {
   refreshManualWindDisplay();
+  if (windMode !== 'manual') return;
   if (!globalWindClient) {
     ui.windStatus.textContent = '通信準備中';
     return;
@@ -125,6 +145,115 @@ async function sendManualWind() {
   }
 }
 
+function windCardinal(degrees) {
+  const labels = ['北', '北東', '東', '南東', '南', '南西', '西', '北西'];
+  return labels[Math.round(normalizeDirectionFromDeg(degrees) / 45) % labels.length];
+}
+
+function displayTime(value) {
+  if (!value) return '--';
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? date.toLocaleString('ja-JP') : value;
+}
+
+function renderLiveWind(state) {
+  const statusLabels = {
+    idle: '待機中', fetching: '取得中', ok: 'LIVE / OK',
+    stale: 'LIVE / STALE', error: 'LIVE / ERROR',
+  };
+  ui.liveWindStatus.textContent = statusLabels[state.status] ?? state.status;
+  ui.liveWindRefresh.disabled = state.requestInFlight;
+  if (state.lastError) {
+    ui.windStatus.textContent = `取得失敗: ${state.lastError.message}`;
+    ui.windStatus.dataset.failed = 'true';
+  } else if (state.status === 'fetching') {
+    ui.windStatus.textContent = 'Open-Meteoから取得中';
+    ui.windStatus.dataset.failed = 'false';
+  }
+  const result = state.lastResult;
+  if (!result) return;
+  const wind = result.wind;
+  ui.liveWindSpeed.textContent = `${wind.speedMS.toFixed(1)} m/s`;
+  ui.liveWindFrom.textContent = `${wind.directionFromDeg.toFixed(0)}° ${windCardinal(wind.directionFromDeg)}から`;
+  ui.liveWindTo.textContent = `${wind.directionToDeg.toFixed(0)}° ${windCardinal(wind.directionToDeg)}へ`;
+  ui.liveWindGust.textContent = `${wind.gustMS.toFixed(1)} m/s`;
+  ui.liveWindValidAt.textContent = displayTime(result.validAt);
+  ui.liveWindFetchedAt.textContent = displayTime(result.fetchedAt);
+  ui.windEnabled.checked = true;
+  ui.windDirection.value = wind.directionToDeg.toFixed(0);
+  ui.windSpeed.value = String(wind.speedMS);
+  refreshManualWindDisplay();
+  if (state.status === 'ok') {
+    ui.windStatus.textContent = state.lastCommandSent
+      ? 'Live風を送信しました'
+      : '最新値を確認（物理値は変更なし）';
+    ui.windStatus.dataset.failed = 'false';
+  }
+}
+
+function setWindInputMode(mode) {
+  const live = mode === 'live';
+  windMode = mode;
+  ui.windControls.dataset.mode = mode;
+  ui.windModeManual.dataset.active = String(!live);
+  ui.windModeLive.dataset.active = String(live);
+  ui.liveWindInfo.hidden = !live;
+  ui.windEnabled.disabled = live;
+  ui.windDirection.disabled = live;
+  ui.windSpeed.disabled = live;
+}
+
+async function selectWindMode(mode) {
+  if (!globalWindClient || mode === windMode) return;
+  if (mode === 'live') {
+    manualWindDraft = currentManualWind();
+    setWindInputMode('live');
+    await globalWindLiveController.activate();
+    return;
+  }
+  globalWindLiveController.deactivate();
+  setWindInputMode('manual');
+  ui.windEnabled.checked = manualWindDraft.enabled;
+  ui.windDirection.value = String(manualWindDraft.directionToDeg);
+  ui.windSpeed.value = String(manualWindDraft.speedMps);
+  refreshManualWindDisplay();
+  await sendManualWind();
+}
+
+async function initializeGlobalWind(config) {
+  if (config?.enabled === false) {
+    ui.windPanel.hidden = true;
+    return;
+  }
+  const manual = config?.manual ?? {};
+  ui.windEnabled.checked = manual.enabled === true;
+  ui.windDirection.value = String(manual.direction_to_deg ?? 0);
+  ui.windSpeed.value = String(manual.speed_m_s ?? 0);
+  ui.windSpeedStddev.value = String(manual.speed_stddev_m_s ?? 0);
+  manualWindDraft = currentManualWind();
+  const venue = config?.venue;
+  if (!venue || !Number.isFinite(Number(venue.latitude)) || !Number.isFinite(Number(venue.longitude))) {
+    throw new Error('Global Wind venue is missing');
+  }
+  ui.liveWindVenue.textContent = `${Number(venue.latitude).toFixed(5)}, ${Number(venue.longitude).toFixed(5)}`;
+  const live = config.live ?? {};
+  const provider = new OpenMeteoProvider({ timeoutMs: Number(live.timeout_sec ?? 5) * 1000 });
+  globalWindLiveController = new GlobalWindLiveController({
+    client: globalWindClient,
+    provider,
+    venue: { latitude: Number(venue.latitude), longitude: Number(venue.longitude) },
+    pollIntervalSec: Number(live.poll_interval_sec ?? 300),
+    staleAfterSec: Number(live.stale_after_sec ?? 900),
+    getSpeedStddevMps: () => Number(ui.windSpeedStddev.value),
+    onState: renderLiveWind,
+  });
+  ui.liveWindSource.href = globalWindLiveController.sourceUrl();
+  setWindInputMode('manual');
+  refreshManualWindDisplay();
+  if (config.initial_mode === 'live') await selectWindMode('live');
+  else await sendManualWind();
+}
+
 function windHeadingFromPointer(event) {
   const rect = ui.windCompass.getBoundingClientRect();
   const east = event.clientX - (rect.left + rect.width / 2);
@@ -133,6 +262,7 @@ function windHeadingFromPointer(event) {
 }
 
 function updateWindHeadingFromPointer(event) {
+  if (windMode !== 'manual') return;
   ui.windDirection.value = windHeadingFromPointer(event).toFixed(0);
   refreshManualWindDisplay();
 }
@@ -514,7 +644,7 @@ async function initialize() {
   await controlClient.start();
   globalWindClient = new GlobalWindClient(manager, runtime.global_wind);
   await globalWindClient.start();
-  ui.windStatus.textContent = '操作待ち';
+  await initializeGlobalWind(runtime.global_wind);
   setUiState('initializing', 'Show Runnerの準備を待っています');
 
   const originLat = Number(runtime.origin.latitude);
@@ -688,8 +818,19 @@ ui.windDirection.addEventListener('change', sendManualWind);
 ui.windSpeed.addEventListener('input', refreshManualWindDisplay);
 ui.windSpeed.addEventListener('change', sendManualWind);
 ui.windSpeedStddev.addEventListener('input', refreshManualWindDisplay);
-ui.windSpeedStddev.addEventListener('change', sendManualWind);
+ui.windSpeedStddev.addEventListener('change', async () => {
+  if (windMode === 'live') {
+    const result = await globalWindLiveController?.setSpeedStddevMps();
+    if (result?.sent) ui.windStatus.textContent = 'Live風のばらつきを送信しました';
+    return;
+  }
+  await sendManualWind();
+});
+ui.windModeManual.addEventListener('click', () => { void selectWindMode('manual'); });
+ui.windModeLive.addEventListener('click', () => { void selectWindMode('live'); });
+ui.liveWindRefresh.addEventListener('click', () => { void globalWindLiveController?.refresh(); });
 ui.windCompass.addEventListener('pointerdown', (event) => {
+  if (windMode !== 'manual') return;
   event.preventDefault();
   windCompassPointerId = event.pointerId;
   ui.windCompass.setPointerCapture?.(event.pointerId);
@@ -718,5 +859,6 @@ window.addEventListener('beforeunload', () => {
   if (cameraCopyStatusTimer !== null) window.clearTimeout(cameraCopyStatusTimer);
   if (lightingCopyStatusTimer !== null) window.clearTimeout(lightingCopyStatusTimer);
   controlClient?.stop();
+  globalWindLiveController?.deactivate();
 });
 initialize().catch((error) => setUiState('failed', error.message));

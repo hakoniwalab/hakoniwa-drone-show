@@ -174,6 +174,15 @@ Task 1対応Recipeでは、`start`しても自動的に離陸しません。`ope
 観客視点では現在のENU位置、yaw、pitch、FOVをサイドパネルへ表示します。調整後に
 3D画面右上には、風操作コンパスと同じ0°=北・90°=東の基準でカメラの視線方位を表示します。
 風操作の矢印は風が実際に流れる方向（to）を示します。
+風パネルはManualとLiveを切り替えられます。Liveはconfigureで解決した会場座標の
+Open-Meteo気象モデル値を既定5分間隔で取得し、気象風向（from）から流れる方向（to）へ
+変換します。`最新値を取得`で即時更新でき、取得に使用したAPI URLも画面から確認できます。
+Liveでも機体ごとの風速標準偏差は変更可能です。gustは参考表示だけに使用します。
+
+Live WeatherデモはOpen-Meteo Free APIを利用します。Free APIの利用条件とrate limitは
+Open-Meteoの現行Termsに従い、Weather dataはOpen-Meteoへの帰属表示を伴います。この機能は
+気象モデル由来の値をシミュレーション表示へ用いるもので、実飛行・航空気象・安全判断には
+使用できません。商用利用時はOpen-Meteoの利用条件とAPI planを別途確認してください。
 `YAML設定をコピー`を押すと、City experimentへ貼り付ける`audience_camera`設定を
 クリップボードへコピーできます。
 
