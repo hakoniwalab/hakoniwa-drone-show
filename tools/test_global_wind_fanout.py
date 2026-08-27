@@ -46,13 +46,17 @@ def encode(value):
     )
 
 
-def command(sequence, vector, *, enabled=True):
+def command(sequence, vector, *, enabled=True, stddev=0.0, seed=1):
     return {
         "schema": "hakoniwa.drone-show/global-wind/v1",
         "publisher_id": "browser-a",
         "sequence": sequence,
         "source": {"mode": "manual", "provider": None, "observed_at": None},
-        "wind": {"enabled": enabled, "vector_ros_m_s": list(vector)},
+        "wind": {
+            "enabled": enabled,
+            "vector_ros_m_s": list(vector),
+            "variation": {"speed_stddev_m_s": stddev, "seed": seed},
+        },
     }
 
 
@@ -93,6 +97,31 @@ class GlobalWindFanoutTest(unittest.TestCase):
         result = self.fanout.reapply_current()
         self.assertEqual(result.drone_count, 2)
         self.assertEqual(len(self.manager.writes) - before, 2)
+
+    def test_speed_variation_is_deterministic_and_never_reverses_direction(self) -> None:
+        manager = FakeManager()
+        fanout = GlobalWindFanout(
+            manager=manager,
+            drone_names=tuple(f"Drone-{index}" for index in range(1, 17)),
+            disturbance_factory=disturbance,
+            disturbance_encoder=encode,
+        )
+        fanout.accept(command(1, (3, 4, 0), stddev=2.0, seed=42))
+        first_vectors = [write[2][2:] for write in manager.writes]
+        self.assertGreater(len({tuple(round(v, 8) for v in vector) for vector in first_vectors}), 1)
+        for x_value, y_value, z_value in first_vectors:
+            self.assertGreaterEqual(3 * x_value + 4 * y_value, 0.0)
+            self.assertAlmostEqual(4 * x_value - 3 * y_value, 0.0)
+            self.assertEqual(z_value, 0.0)
+
+        manager.writes.clear()
+        fanout.reapply_current()
+        self.assertEqual([write[2][2:] for write in manager.writes], first_vectors)
+
+    def test_zero_standard_deviation_preserves_uniform_wind(self) -> None:
+        self.fanout.accept(command(1, (3, 4, 0), stddev=0.0))
+        self.assertEqual(self.manager.writes[0][2][2:], (3.0, 4.0, 0.0))
+        self.assertEqual(self.manager.writes[1][2][2:], (3.0, 4.0, 0.0))
 
     def test_asset_initialization_loads_shm_before_writes_and_callback(self) -> None:
         endpoint = SimpleNamespace(

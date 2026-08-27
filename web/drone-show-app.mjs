@@ -54,6 +54,8 @@ const ui = {
   windDirection: document.getElementById('wind-direction'),
   windSpeed: document.getElementById('wind-speed'),
   windSpeedValue: document.getElementById('wind-speed-value'),
+  windSpeedStddev: document.getElementById('wind-speed-stddev'),
+  windSpeedStddevValue: document.getElementById('wind-speed-stddev-value'),
   windVector: document.getElementById('wind-vector'),
   windStatus: document.getElementById('wind-status'),
 };
@@ -89,6 +91,7 @@ function currentManualWind() {
     enabled: ui.windEnabled.checked,
     directionToDeg: normalizeDirectionFromDeg(ui.windDirection.value),
     speedMps: Number(ui.windSpeed.value),
+    speedStddevMps: Number(ui.windSpeedStddev.value),
   };
 }
 
@@ -96,6 +99,7 @@ function refreshManualWindDisplay() {
   const wind = currentManualWind();
   ui.windDirection.value = wind.directionToDeg.toFixed(0);
   ui.windSpeedValue.textContent = `${wind.speedMps.toFixed(1)} m/s`;
+  ui.windSpeedStddevValue.textContent = `${wind.speedStddevMps.toFixed(1)} m/s`;
   ui.windPointer.style.transform = `translate(-50%, -100%) rotate(${wind.directionToDeg}deg)`;
   const vector = wind.enabled
     ? flowDirectionToRos(wind.directionToDeg, wind.speedMps)
@@ -683,6 +687,8 @@ ui.windDirection.addEventListener('input', refreshManualWindDisplay);
 ui.windDirection.addEventListener('change', sendManualWind);
 ui.windSpeed.addEventListener('input', refreshManualWindDisplay);
 ui.windSpeed.addEventListener('change', sendManualWind);
+ui.windSpeedStddev.addEventListener('input', refreshManualWindDisplay);
+ui.windSpeedStddev.addEventListener('change', sendManualWind);
 ui.windCompass.addEventListener('pointerdown', (event) => {
   event.preventDefault();
   windCompassPointerId = event.pointerId;

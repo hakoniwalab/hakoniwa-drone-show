@@ -21,6 +21,7 @@ COMMAND_PDU_NAME = "global_wind_command"
 COMMAND_CHANNEL_ID = 2
 MAX_SEQUENCE = (1 << 53) - 1
 MAX_ABS_COMPONENT_M_S = 100.0
+MAX_SPEED_STDDEV_M_S = 100.0
 _PUBLISHER_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$")
 
 
@@ -117,7 +118,10 @@ def validate_message(message: Any) -> dict[str, Any]:
         raise GlobalWindProtocolError("source.observed_at must be null or a string")
 
     wind = message.get("wind")
-    if not isinstance(wind, dict) or set(wind) != {"enabled", "vector_ros_m_s"}:
+    if not isinstance(wind, dict) or set(wind) not in (
+        {"enabled", "vector_ros_m_s"},
+        {"enabled", "vector_ros_m_s", "variation"},
+    ):
         raise GlobalWindProtocolError("invalid wind")
     enabled = wind.get("enabled")
     if not isinstance(enabled, bool):
@@ -136,6 +140,30 @@ def validate_message(message: Any) -> dict[str, Any]:
     if not enabled and any(normalized_vector):
         raise GlobalWindProtocolError("disabled wind must use a zero vector")
 
+    variation = wind.get("variation", {"speed_stddev_m_s": 0.0, "seed": 1})
+    if not isinstance(variation, dict) or set(variation) != {
+        "speed_stddev_m_s",
+        "seed",
+    }:
+        raise GlobalWindProtocolError("invalid wind.variation")
+    speed_stddev_m_s = _finite_number(
+        variation.get("speed_stddev_m_s"), "wind.variation.speed_stddev_m_s"
+    )
+    if not 0.0 <= speed_stddev_m_s <= MAX_SPEED_STDDEV_M_S:
+        raise GlobalWindProtocolError(
+            f"wind.variation.speed_stddev_m_s must be within [0, {MAX_SPEED_STDDEV_M_S}]"
+        )
+    seed = variation.get("seed")
+    if (
+        isinstance(seed, bool)
+        or not isinstance(seed, int)
+        or seed < 0
+        or seed > MAX_SEQUENCE
+    ):
+        raise GlobalWindProtocolError(
+            "wind.variation.seed must be a non-negative safe integer"
+        )
+
     return {
         "schema": SCHEMA,
         "publisher_id": publisher_id,
@@ -144,13 +172,25 @@ def validate_message(message: Any) -> dict[str, Any]:
         "wind": {
             "enabled": enabled,
             "vector_ros_m_s": normalized_vector,
+            "variation": {
+                "speed_stddev_m_s": speed_stddev_m_s,
+                "seed": seed,
+            },
         },
     }
 
 
-def physical_state_key(message: Mapping[str, Any]) -> tuple[bool, tuple[float, float, float]]:
+def physical_state_key(message: Mapping[str, Any]) -> tuple[Any, ...]:
     wind = message["wind"]
-    return bool(wind["enabled"]), tuple(float(value) for value in wind["vector_ros_m_s"])
+    if not wind["enabled"]:
+        return False, (0.0, 0.0, 0.0)
+    variation = wind["variation"]
+    return (
+        True,
+        tuple(float(value) for value in wind["vector_ros_m_s"]),
+        float(variation["speed_stddev_m_s"]),
+        int(variation["seed"]),
+    )
 
 
 class GlobalWindReceiverState:
@@ -159,7 +199,7 @@ class GlobalWindReceiverState:
     def __init__(self) -> None:
         self.last_sequence_by_publisher: dict[str, int] = {}
         self.current_message: dict[str, Any] | None = None
-        self.current_key: tuple[bool, tuple[float, float, float]] | None = None
+        self.current_key: tuple[Any, ...] | None = None
 
     def accept(self, message: Any) -> tuple[dict[str, Any], bool]:
         normalized = validate_message(message)

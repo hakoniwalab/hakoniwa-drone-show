@@ -31,16 +31,17 @@ python tools/recipe/virtual_drone_show.py open-viewer
 
 1. 「風を有効にする」をONにする
 2. コンパスをドラッグして、風を流したい方角を指定する
-3. 風速を変更する
-4. 画面に`送信済み #N`と表示されることを確認する
-5. 風向の数値欄で同じ値を再確定し、`変更なし（未送信）`になることを確認する
-6. 風をOFFにしてzero vectorを送信する
+3. 平均風速を変更する
+4. 必要なら「機体ごとのばらつき（標準偏差）」を変更する。0では全機が同じ風速になる
+5. 画面に`送信済み #N`と表示されることを確認する
+6. 風向の数値欄で同じ値を再確定し、`変更なし（未送信）`になることを確認する
+7. 風をOFFにしてzero vectorを送信する
 
 Launcherが起動した`global-wind-asset`のログには、初期化とSHM callbackの処理結果が出ます。
 
 ```text
 [GLOBAL_WIND] SHM callback ready
-[GLOBAL_WIND] changed enabled=true vector_ros_m_s=[...] drones=200 elapsed_msec=...
+[GLOBAL_WIND] changed enabled=true vector_ros_m_s=[...] speed_stddev_m_s=... seed=1 drones=200 elapsed_msec=...
 ```
 
 ログファイル名と場所は生成済みLauncher設定で確認できます。起動時とreset時に1回、または
@@ -57,7 +58,9 @@ PDUはShow Controlと同様の固定長frameです。
 - payload: UTF-8 JSON
 - remaining bytes: zero padding
 
-物理入力の正本は`wind.enabled`と`wind.vector_ros_m_s`です。手動操作のコンパスは
+平均風の物理入力は`wind.enabled`と`wind.vector_ros_m_s`です。`wind.variation`には
+機体ごとの風速標準偏差と再現用seedを保持します。標準偏差0では従来と同じ一様風になり、
+標準偏差が正の場合も方向を変えず、負の風速を0へ制限するため逆流しません。手動操作のコンパスは
 「風がその方角へ流れる」を表し、ブラウザでDisturbance PDUのROS座標へ変換してから送信します。
 例えばNは北向き、Eは東向きの流れです。気象データの風向（from）を利用する場合は、送信前に
 流れる方向（to）へ反転します。

@@ -97,7 +97,9 @@ def main(argv: list[str] | None = None) -> int:
             wind = message["wind"]
             log_result(
                 f"changed enabled={str(wind['enabled']).lower()} "
-                f"vector_ros_m_s={wind['vector_ros_m_s']}",
+                f"vector_ros_m_s={wind['vector_ros_m_s']} "
+                f"speed_stddev_m_s={wind['variation']['speed_stddev_m_s']} "
+                f"seed={wind['variation']['seed']}",
                 result,
             )
         except (protocol.GlobalWindProtocolError, GlobalWindFanoutError) as exc:

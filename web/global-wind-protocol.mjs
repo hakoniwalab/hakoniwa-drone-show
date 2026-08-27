@@ -1,5 +1,6 @@
 export const GLOBAL_WIND_SCHEMA = 'hakoniwa.drone-show/global-wind/v1';
 export const MAX_WIND_COMPONENT_M_S = 100;
+export const MAX_WIND_STDDEV_M_S = 100;
 export const FRAME_SIZE = 1024;
 export const HEADER_SIZE = 8;
 export const MAX_JSON_BYTES = FRAME_SIZE - HEADER_SIZE;
@@ -73,6 +74,8 @@ export function manualWindCommand({
   enabled,
   directionToDeg,
   speedMps,
+  speedStddevMps = 0,
+  variationSeed = 1,
 }) {
   if (typeof publisherId !== 'string' || publisherId.length < 1) {
     throw new Error('publisherId is required');
@@ -81,6 +84,11 @@ export function manualWindCommand({
     throw new Error('sequence must be a positive safe integer');
   }
   const active = Boolean(enabled);
+  const stddev = clampWindSpeedMps(speedStddevMps, MAX_WIND_STDDEV_M_S);
+  const seed = Number(variationSeed);
+  if (!Number.isSafeInteger(seed) || seed < 0) {
+    throw new Error('variationSeed must be a non-negative safe integer');
+  }
   return {
     schema: GLOBAL_WIND_SCHEMA,
     publisher_id: publisherId,
@@ -91,12 +99,22 @@ export function manualWindCommand({
       vector_ros_m_s: active
         ? flowDirectionToRos(directionToDeg, speedMps)
         : [0, 0, 0],
+      variation: {
+        speed_stddev_m_s: stddev,
+        seed,
+      },
     },
   };
 }
 
 export function physicalWindKey(command) {
-  return JSON.stringify([command.wind.enabled, command.wind.vector_ros_m_s]);
+  if (!command.wind.enabled) return JSON.stringify([false, [0, 0, 0]]);
+  return JSON.stringify([
+    true,
+    command.wind.vector_ros_m_s,
+    command.wind.variation.speed_stddev_m_s,
+    command.wind.variation.seed,
+  ]);
 }
 
 export function encodeFrame(command) {

@@ -24,13 +24,14 @@ export class GlobalWindClient {
     if (!declared) throw new Error('Global Wind command PDU declaration failed');
   }
 
-  async sendManual({ enabled, directionToDeg, speedMps }) {
+  async sendManual({ enabled, directionToDeg, speedMps, speedStddevMps }) {
     const command = manualWindCommand({
       publisherId: this.publisherId,
       sequence: this.sequence + 1,
       enabled,
       directionToDeg,
       speedMps,
+      speedStddevMps,
     });
     const key = physicalWindKey(command);
     if (key === this.lastPhysicalKey) return { sent: false, command };

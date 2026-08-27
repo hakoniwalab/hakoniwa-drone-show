@@ -110,9 +110,13 @@
           <label class="wind-direction">風が流れる方向（to）
             <span><input id="wind-direction" type="number" min="0" max="359" step="1" value="0">°</span>
           </label>
-          <label class="wind-speed">風速 <output id="wind-speed-value">0.0 m/s</output>
+          <label class="wind-speed">平均風速 <output id="wind-speed-value">0.0 m/s</output>
             <input id="wind-speed" type="range" min="0" max="30" step="0.1" value="0">
           </label>
+          <label class="wind-speed">機体ごとのばらつき（標準偏差） <output id="wind-speed-stddev-value">0.0 m/s</output>
+            <input id="wind-speed-stddev" type="range" min="0" max="15" step="0.1" value="0">
+          </label>
+          <p class="wind-help">標準偏差0では全機が同じ風速です。ばらつきを増やしても風向は変わらず、逆方向には流れません。</p>
           <p id="wind-vector" class="wind-vector">[0.00, 0.00, 0.00] ROS m/s</p>
           <p id="wind-status" class="wind-status" role="status" aria-live="polite">通信準備中</p>
         </div>

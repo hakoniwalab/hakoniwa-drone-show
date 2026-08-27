@@ -26,9 +26,11 @@ assert.equal(normalizeDirectionFromDeg(-90), 270);
 const enabled = manualWindCommand({
   publisherId: 'browser-test', sequence: 1, enabled: true,
   directionToDeg: 45, speedMps: 4,
+  speedStddevMps: 1.5,
 });
 assert.equal(enabled.schema, 'hakoniwa.drone-show/global-wind/v1');
 assert.equal(enabled.wind.enabled, true);
+assert.deepEqual(enabled.wind.variation, { speed_stddev_m_s: 1.5, seed: 1 });
 
 const disabled = manualWindCommand({
   publisherId: 'browser-test', sequence: 2, enabled: false,

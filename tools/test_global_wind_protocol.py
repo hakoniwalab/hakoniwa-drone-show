@@ -9,7 +9,9 @@ from tools.global_wind_protocol import (
 )
 
 
-def command(*, publisher="browser-a", sequence=1, enabled=True, vector=None):
+def command(
+    *, publisher="browser-a", sequence=1, enabled=True, vector=None, variation=None
+):
     return {
         "schema": "hakoniwa.drone-show/global-wind/v1",
         "publisher_id": publisher,
@@ -18,6 +20,7 @@ def command(*, publisher="browser-a", sequence=1, enabled=True, vector=None):
         "wind": {
             "enabled": enabled,
             "vector_ros_m_s": [1.0, -2.0, 0.0] if vector is None else vector,
+            **({} if variation is None else {"variation": variation}),
         },
     }
 
@@ -50,6 +53,21 @@ class GlobalWindProtocolTest(unittest.TestCase):
             validate_message(command(enabled=False, vector=[0, 0, 0]))["wind"]["enabled"]
         )
 
+    def test_variation_defaults_to_uniform_and_is_validated(self):
+        normalized = validate_message(command())
+        self.assertEqual(
+            normalized["wind"]["variation"],
+            {"speed_stddev_m_s": 0.0, "seed": 1},
+        )
+        varied = validate_message(
+            command(variation={"speed_stddev_m_s": 1.5, "seed": 42})
+        )
+        self.assertEqual(varied["wind"]["variation"]["speed_stddev_m_s"], 1.5)
+        with self.assertRaisesRegex(GlobalWindProtocolError, "within"):
+            validate_message(
+                command(variation={"speed_stddev_m_s": -0.1, "seed": 42})
+            )
+
     def test_rejects_non_finite_and_unknown_fields(self):
         with self.assertRaisesRegex(GlobalWindProtocolError, "finite"):
             validate_message(command(vector=[float("nan"), 0, 0]))
@@ -64,6 +82,13 @@ class GlobalWindProtocolTest(unittest.TestCase):
         self.assertTrue(changed)
         _, changed = state.accept(command(sequence=2))
         self.assertFalse(changed)
+        _, changed = state.accept(
+            command(
+                sequence=3,
+                variation={"speed_stddev_m_s": 1.0, "seed": 1},
+            )
+        )
+        self.assertTrue(changed)
 
     def test_sequence_is_scoped_to_publisher(self):
         state = GlobalWindReceiverState()
