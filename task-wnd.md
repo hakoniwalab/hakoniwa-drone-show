@@ -240,13 +240,13 @@ Global Wind Asset側へ入力モード固有処理を持ち込まない。
 
 ## Task WND-3: Live weather
 
-- [ ] 候補providerをライセンス、CORS、認証、更新頻度、地点解像度で比較する
-- [ ] 会場緯度経度から最新風を取得するprovider adapterを追加する
-- [ ] 取得値をGlobal Wind JSON v1へ正規化する
-- [ ] 取得周期をprovider制約に合わせ、値が変化した場合だけ送信する
-- [ ] Manual/LiveをUIで切り替えられる
-- [ ] provider名、観測地点、観測時刻を表示する
-- [ ] 通信失敗、欠測、古い観測値の扱いを実装する
+- [x] 候補providerをライセンス、CORS、認証、更新頻度、地点解像度で比較する
+- [x] 会場緯度経度から最新風を取得するprovider adapterを追加する
+- [x] 取得値をGlobal Wind JSON v1へ正規化する
+- [x] 取得周期をprovider制約に合わせ、値が変化した場合だけ送信する
+- [x] Manual/LiveをUIで切り替えられる
+- [x] provider名、観測地点、観測時刻を表示する
+- [x] 通信失敗、欠測、古い観測値の扱いを実装する
 
 ## Task WND-4: AWARD比較デモ
 
