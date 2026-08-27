@@ -571,6 +571,15 @@ def materialize_browser(
             "initial_mode": initial_mode,
             "audience_available": audience is not None,
         },
+        "ar": {
+            **show_config.get("ar", {"enabled": False}),
+            "ground_height_m": float(
+                marker.get("flight_plan", {}).get(
+                    "altitude_reference_height_m", 0.0
+                )
+            ),
+            "secure_websocket_url": f"wss://{websocket_host}:8443/pdu",
+        },
         "show_ir": {
             "url": "./show-ir.json",
             "sha256": _sha256(show_ir_path),
@@ -653,6 +662,9 @@ def patch_launcher(
     no_cache_http_server: Path | None = None,
     show_ir_path: Path | None = None,
     show_ir_max_speed_m_s: float | None = None,
+    ar_gateway: Path | None = None,
+    ar_certificate: Path | None = None,
+    ar_private_key: Path | None = None,
 ) -> Path:
     launcher = _read_json(launcher_path.resolve())
     assets = launcher.get("assets")
@@ -710,5 +722,44 @@ def patch_launcher(
                 f"No-cache HTTP server does not exist: {server_path}"
             )
         http_server["args"] = [str(server_path), "8000"]
+    if ar_gateway is not None:
+        gateway_path = ar_gateway.resolve()
+        certificate_path = ar_certificate.resolve() if ar_certificate else None
+        private_key_path = ar_private_key.resolve() if ar_private_key else None
+        if not gateway_path.is_file():
+            raise ShowRuntimeError(f"AR HTTPS Gateway does not exist: {gateway_path}")
+        if not certificate_path or not certificate_path.is_file():
+            raise ShowRuntimeError("AR HTTPS certificate does not exist")
+        if not private_key_path or not private_key_path.is_file():
+            raise ShowRuntimeError("AR HTTPS private key does not exist")
+        http_server = by_name.get("threejs-viewer-webserver")
+        if not isinstance(http_server, dict):
+            raise ShowRuntimeError(
+                "Launcher is missing threejs-viewer-webserver"
+            )
+        gateway = {
+            "name": "ar-https-gateway",
+            "activation_timing": "after_start",
+            "command": http_server["command"],
+            "args": [
+                str(gateway_path),
+                "--cert",
+                str(certificate_path),
+                "--key",
+                str(private_key_path),
+                "--https-port",
+                "8443",
+                "--wss-port",
+                "8766",
+                "--backend-host",
+                "127.0.0.1",
+                "--backend-port",
+                "8765",
+            ],
+            "cwd": http_server["cwd"],
+            "depends_on": ["web-bridge-fleets"],
+        }
+        assets[:] = [asset for asset in assets if asset.get("name") != gateway["name"]]
+        assets.append(gateway)
     _write_json(launcher_path, launcher)
     return launcher_path

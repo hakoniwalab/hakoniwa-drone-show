@@ -12,6 +12,7 @@ Hakoniwa向けバーチャルドローンショーの制作、計画、検証お
 - Show Experience Runner、開始待機、Show Status通知
 - 計画プレビューと実行summary
 - PRO環境を前提とするバーチャルドローンショー専用Recipeとexperiment
+- iPhone/Android共通のカメラ重畳ARプレビュー
 
 ## 実装配置の原則
 
@@ -63,6 +64,37 @@ python3 tools/recipe/virtual_drone_show.py status
 python3 tools/recipe/virtual_drone_show.py open-viewer
 python3 tools/recipe/virtual_drone_show.py stop
 ```
+
+## カメラARプレビュー
+
+ARページはWebXRへ依存せず、端末カメラ映像へ透明なThree.js描画を重ねます。iPhone
+SafariとAndroid Chromeで共通の基盤を使い、Android WebXR対応は将来追加できます。
+
+初期観客位置は起動時に端末の緯度経度を一度だけ取得して会場基準ENUへ変換します。
+以後GPSへ追従せず、必要な場合だけ右下の小さな移動ボタンから仮想位置を調整します。
+編隊が視野外なら画面端の矢印で位置を案内します。視野内では中央マーカーを出さず、
+左上の距離ボタンで距離表示を切り替えます。左下には初期位置からの前後左右移動、
+地面からの高さ、最寄り機までの距離を表示します。端末姿勢によるyaw/pitch連動はYAMLで
+有効・無効を選べます。
+
+iPhoneでカメラと現在地を利用するため、ARページは生成したローカルCAを信頼した上で
+HTTPS/WSS Gatewayから開きます。初回だけ次の手順が必要です。
+
+1. `configure`後、`viewer-access/hakoniwa-ar-ca.crt`をAirDrop等でiPhoneへ渡してインストールする。
+2. iPhoneの「設定 → 一般 → 情報 → 証明書信頼設定」で`Hakoniwa Drone Show Local CA`を信頼する。
+3. `doctor`、`start`後に`viewer-access/ar-viewer-qr.svg`を読み取る。
+4. カメラARを開始し、カメラと現在地を許可する。
+
+MacからURLを確認する場合は次を使用します。
+
+```bash
+python3 tools/recipe/virtual_drone_show.py open-ar
+```
+
+通常ViewerのHTTP `:8000`とWebSocket `:8765`は変更しません。AR専用Gatewayは
+HTTPS `:8443`の同一オリジン上でARページと`/pdu`のWSSを提供します。互換・診断用の
+WSS `:8766`も維持します。詳細は[ARプレビュー手順](docs/ar-preview.md)を
+参照してください。
 
 PLATEAU City Worldを使う場合はYAMLを`environment.mode: plateau`へ変更し、Business Packの
 City World Workerが生成した`city-world-receipt.json`を指定します。

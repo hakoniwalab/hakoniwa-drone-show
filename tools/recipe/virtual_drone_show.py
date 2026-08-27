@@ -94,6 +94,92 @@ _CITY_MARKER_NAME = "mujoco-city-fleet.json"
 _FLAT_MARKER_NAME = "mujoco-flat-fleet.json"
 
 
+def _run_openssl(arguments: list[str]) -> None:
+    try:
+        completed = subprocess.run(
+            ["openssl", *arguments],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except OSError as exc:
+        raise base.RecipeError(
+            "AR HTTPS certificate generation requires openssl"
+        ) from exc
+    if completed.returncode != 0:
+        detail = completed.stderr.strip() or completed.stdout.strip()
+        raise base.RecipeError(f"openssl failed: {detail}")
+
+
+def _prepare_ar_tls(recipe_root: Path, host: str) -> dict[str, Path]:
+    host = str(ipaddress.IPv4Address(host))
+    output = recipe_root / "ar-tls"
+    output.mkdir(parents=True, exist_ok=True)
+    ca_key = output / "hakoniwa-ar-ca.key"
+    ca_certificate = output / "hakoniwa-ar-ca.crt"
+    server_key = output / "hakoniwa-ar-server.key"
+    server_certificate = output / "hakoniwa-ar-server.crt"
+    server_request = output / "hakoniwa-ar-server.csr"
+    server_extensions = output / "hakoniwa-ar-server.ext"
+    configured_host = output / "server-host.txt"
+
+    if not ca_key.is_file() or not ca_certificate.is_file():
+        _run_openssl(
+            [
+                "req", "-x509", "-newkey", "rsa:2048", "-nodes",
+                "-keyout", str(ca_key), "-out", str(ca_certificate),
+                "-days", "3650", "-sha256",
+                "-subj", "/CN=Hakoniwa Drone Show Local CA",
+                "-addext", "basicConstraints=critical,CA:TRUE",
+                "-addext", "keyUsage=critical,keyCertSign,cRLSign",
+            ]
+        )
+        ca_key.chmod(0o600)
+
+    certificate_matches = (
+        server_key.is_file()
+        and server_certificate.is_file()
+        and configured_host.is_file()
+        and configured_host.read_text(encoding="utf-8").strip() == host
+    )
+    if not certificate_matches:
+        server_extensions.write_text(
+            "\n".join(
+                [
+                    "basicConstraints=critical,CA:FALSE",
+                    "keyUsage=critical,digitalSignature,keyEncipherment",
+                    "extendedKeyUsage=serverAuth",
+                    f"subjectAltName=IP:{host},IP:127.0.0.1,DNS:localhost",
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+        _run_openssl(
+            [
+                "req", "-newkey", "rsa:2048", "-nodes",
+                "-keyout", str(server_key), "-out", str(server_request),
+                "-sha256", "-subj", f"/CN={host}",
+            ]
+        )
+        _run_openssl(
+            [
+                "x509", "-req", "-in", str(server_request),
+                "-CA", str(ca_certificate), "-CAkey", str(ca_key),
+                "-CAcreateserial", "-out", str(server_certificate),
+                "-days", "825", "-sha256", "-extfile", str(server_extensions),
+            ]
+        )
+        server_key.chmod(0o600)
+        configured_host.write_text(host + "\n", encoding="utf-8")
+        server_request.unlink(missing_ok=True)
+    return {
+        "ca_certificate": ca_certificate,
+        "server_certificate": server_certificate,
+        "server_key": server_key,
+    }
+
+
 def _environment_settings(experiment_path: Path) -> dict:
     raw = _BASE_LOAD_SIMPLE_YAML(experiment_path)
     value = raw.get("environment", {"mode": "plateau"})
@@ -260,6 +346,27 @@ def _show_mujoco_runtime_checks(paths, drone_root, experiment, system_name):
             checks.append(("Drone PRO visual-state publisher", True, str(base.resolve_visual_state_publisher(drone_root, system_name))))
         except base.RecipeError as exc:
             checks.append(("Drone PRO visual-state publisher", False, str(exc)))
+    if marker.get("drone_show", {}).get("ar", {}).get("enabled") is True:
+        tls_root = paths.recipe_root / "ar-tls"
+        certificate = tls_root / "hakoniwa-ar-server.crt"
+        private_key = tls_root / "hakoniwa-ar-server.key"
+        checks.append(
+            (
+                "AR HTTPS certificate",
+                certificate.is_file() and private_key.is_file(),
+                str(certificate),
+            )
+        )
+        for port in (8443, 8766):
+            available = base._port_available(port)
+            if available is not None:
+                checks.append(
+                    (
+                        f"AR port {port}",
+                        available,
+                        "available" if available else "in use",
+                    )
+                )
     return checks
 
 
@@ -473,6 +580,134 @@ def _viewer_settings(experiment_path: Path) -> dict:
     return settings
 
 
+def _ar_settings(experiment_path: Path) -> dict:
+    raw = _BASE_LOAD_SIMPLE_YAML(experiment_path)
+    ar = raw.get("ar", {})
+    if not isinstance(ar, dict):
+        raise base.RecipeError("ar must be a mapping")
+    unknown = sorted(set(ar) - {"enabled", "venue", "preview"})
+    if unknown:
+        raise base.RecipeError("ar has unknown fields: " + ", ".join(unknown))
+    enabled = ar.get("enabled", False)
+    if not isinstance(enabled, bool):
+        raise base.RecipeError("ar.enabled must be boolean")
+    if not enabled:
+        return {"enabled": False}
+
+    def coordinate(mapping, prefix):
+        if not isinstance(mapping, dict):
+            raise base.RecipeError(f"{prefix} must be a mapping")
+        unknown_coordinate = sorted(set(mapping) - {"latitude", "longitude"})
+        if unknown_coordinate:
+            raise base.RecipeError(
+                f"{prefix} has unknown fields: " + ", ".join(unknown_coordinate)
+            )
+        latitude = mapping.get("latitude")
+        longitude = mapping.get("longitude")
+        if (
+            not isinstance(latitude, (int, float))
+            or isinstance(latitude, bool)
+            or not math.isfinite(float(latitude))
+            or not -90.0 <= float(latitude) <= 90.0
+        ):
+            raise base.RecipeError(f"{prefix}.latitude must be within [-90, 90]")
+        if (
+            not isinstance(longitude, (int, float))
+            or isinstance(longitude, bool)
+            or not math.isfinite(float(longitude))
+            or not -180.0 <= float(longitude) <= 180.0
+        ):
+            raise base.RecipeError(f"{prefix}.longitude must be within [-180, 180]")
+        return {"latitude": float(latitude), "longitude": float(longitude)}
+
+    venue = ar.get("venue")
+    if not isinstance(venue, dict):
+        raise base.RecipeError("ar.venue must be a mapping")
+    unknown_venue = sorted(set(venue) - {"latitude", "longitude", "heading_deg"})
+    if unknown_venue:
+        raise base.RecipeError(
+            "ar.venue has unknown fields: " + ", ".join(unknown_venue)
+        )
+    venue_coordinate = coordinate(
+        {key: venue.get(key) for key in ("latitude", "longitude")},
+        "ar.venue",
+    )
+    heading = venue.get("heading_deg", 0.0)
+    if (
+        not isinstance(heading, (int, float))
+        or isinstance(heading, bool)
+        or not math.isfinite(float(heading))
+    ):
+        raise base.RecipeError("ar.venue.heading_deg must be finite")
+
+    preview = ar.get("preview", {})
+    if not isinstance(preview, dict):
+        raise base.RecipeError("ar.preview must be a mapping")
+    unknown_preview = sorted(
+        set(preview)
+        - {
+            "location_source",
+            "override",
+            "eye_height_m",
+            "movement_speed_m_s",
+            "device_orientation",
+        }
+    )
+    if unknown_preview:
+        raise base.RecipeError(
+            "ar.preview has unknown fields: " + ", ".join(unknown_preview)
+        )
+    location_source = preview.get("location_source", "device")
+    if location_source not in {"device", "override"}:
+        raise base.RecipeError(
+            "ar.preview.location_source must be device or override"
+        )
+    override = preview.get("override")
+    resolved_override = (
+        coordinate(override, "ar.preview.override")
+        if override is not None
+        else None
+    )
+    if location_source == "override" and resolved_override is None:
+        raise base.RecipeError(
+            "ar.preview.override is required when location_source is override"
+        )
+    eye_height = preview.get("eye_height_m", 1.6)
+    if (
+        not isinstance(eye_height, (int, float))
+        or isinstance(eye_height, bool)
+        or not math.isfinite(float(eye_height))
+        or not 0.0 < float(eye_height) <= 10.0
+    ):
+        raise base.RecipeError("ar.preview.eye_height_m must be within (0, 10]")
+    movement_speed = preview.get("movement_speed_m_s", 5.0)
+    if (
+        not isinstance(movement_speed, (int, float))
+        or isinstance(movement_speed, bool)
+        or not math.isfinite(float(movement_speed))
+        or not 0.0 < float(movement_speed) <= 100.0
+    ):
+        raise base.RecipeError(
+            "ar.preview.movement_speed_m_s must be within (0, 100]"
+        )
+    orientation = preview.get("device_orientation", "optional")
+    if orientation not in {"off", "optional"}:
+        raise base.RecipeError(
+            "ar.preview.device_orientation must be off or optional"
+        )
+    return {
+        "enabled": True,
+        "venue": {**venue_coordinate, "heading_deg": float(heading) % 360.0},
+        "preview": {
+            "location_source": location_source,
+            "override": resolved_override,
+            "eye_height_m": float(eye_height),
+            "movement_speed_m_s": float(movement_speed),
+            "device_orientation": orientation,
+        },
+    }
+
+
 def _map_viewer_url_base(experiment_path: Path) -> str:
     raw = _BASE_LOAD_SIMPLE_YAML(experiment_path)
     viewer = raw.get("viewer")
@@ -525,11 +760,27 @@ def _open_viewer(
     )
 
 
+def _open_ar_viewer(experiment_path: Path) -> int:
+    ar = _ar_settings(experiment_path)
+    if ar.get("enabled") is not True:
+        raise base.RecipeError("ar.enabled=false; AR Viewer is unavailable")
+    map_url = _map_viewer_url_base(experiment_path)
+    host = map_url.split("//", 1)[1].split(":", 1)[0]
+    return (
+        0
+        if base.open_browser(
+            f"https://{host}:8443/drone-show/ar/index.html"
+        )
+        else 1
+    )
+
+
 def _load_base_compatible_experiment(path: Path):
     """Adapt the Show-facing scale to the generic word Recipe contract."""
 
     raw = _BASE_LOAD_SIMPLE_YAML(path)
     _environment_settings(path)
+    _ar_settings(path)
     viewer = raw.get("viewer")
     if viewer is not None:
         _viewer_settings(path)
@@ -538,6 +789,7 @@ def _load_base_compatible_experiment(path: Path):
         compatible = copy.deepcopy(raw)
         compatible.pop("viewer", None)
         compatible.pop("environment", None)
+        compatible.pop("ar", None)
         return compatible
     formation_scale_m = _formation_scale_m(path)
     _formation_audience_tilt_deg(path)
@@ -554,6 +806,7 @@ def _load_base_compatible_experiment(path: Path):
     compatible = copy.deepcopy(raw)
     compatible.pop("viewer", None)
     compatible.pop("environment", None)
+    compatible.pop("ar", None)
     compatible_scenario = compatible["scenario"]
     del compatible_scenario["formation"]
     del compatible_scenario["max_speed_m_s"]
@@ -627,6 +880,19 @@ def _write_show_launcher(
         / "show-ir"
         / "show-ir.json",
     )
+    ar_tls = None
+    if marker.get("drone_show", {}).get("ar", {}).get("enabled") is True:
+        host = marker["drone_show"]["viewer"]["network"]["host"]
+        ar_tls = _prepare_ar_tls(paths.recipe_root, host)
+        public_ca = (
+            paths.recipe_root
+            / "web"
+            / "map-viewer"
+            / "drone-show"
+            / "ar"
+            / "hakoniwa-ar-ca.crt"
+        )
+        public_ca.write_bytes(ar_tls["ca_certificate"].read_bytes())
     return show_runtime.patch_launcher(
         launcher,
         show_runner=SHOW_ROOT / "tools" / "show_experience_runner.py",
@@ -638,6 +904,15 @@ def _write_show_launcher(
         / "show-ir"
         / "show-ir.json",
         show_ir_max_speed_m_s=experiment.speed_m_s,
+        ar_gateway=(
+            SHOW_ROOT / "tools" / "ar_https_gateway.py"
+            if ar_tls is not None
+            else None
+        ),
+        ar_certificate=(
+            ar_tls["server_certificate"] if ar_tls is not None else None
+        ),
+        ar_private_key=(ar_tls["server_key"] if ar_tls is not None else None),
     )
 
 
@@ -659,6 +934,7 @@ def parser() -> argparse.ArgumentParser:
             "status",
             "smoke",
             "open-viewer",
+            "open-ar",
             "stop",
         ],
     )
@@ -788,6 +1064,7 @@ def configure(args: argparse.Namespace, experiment_path: Path, drone_root: Path)
     )
     show_definition_path, show_definition = _show_definition(experiment_path)
     viewer_settings = _viewer_settings(experiment_path)
+    ar_settings = _ar_settings(experiment_path)
     rc = base.configure(
         experiment_path,
         drone_root,
@@ -842,6 +1119,7 @@ def configure(args: argparse.Namespace, experiment_path: Path, drone_root: Path)
         "formation_scale_m": formation_scale_m,
         "max_speed_m_s": experiment.speed_m_s,
         "viewer": viewer_settings,
+        "ar": ar_settings,
         "show_definition": {
             "path": str(show_definition_path),
             "sha256": hashlib.sha256(show_definition_path.read_bytes()).hexdigest(),
@@ -872,6 +1150,26 @@ def configure(args: argparse.Namespace, experiment_path: Path, drone_root: Path)
     viewer_qr_path = write_viewer_qr(
         viewer_access / "viewer-qr.svg", viewer_url
     )
+    ar_url = None
+    ar_qr_path = None
+    ar_ca_path = None
+    ar_ca_qr_path = None
+    if ar_settings.get("enabled") is True:
+        host = viewer_settings["network"]["host"]
+        ar_tls = _prepare_ar_tls(paths.recipe_root, host)
+        ar_url = f"https://{host}:8443/drone-show/ar/index.html"
+        (viewer_access / "ar-viewer-url.txt").write_text(
+            ar_url + "\n", encoding="utf-8"
+        )
+        ar_qr_path = write_viewer_qr(
+            viewer_access / "ar-viewer-qr.svg", ar_url
+        )
+        ar_ca_path = viewer_access / "hakoniwa-ar-ca.crt"
+        ar_ca_path.write_bytes(ar_tls["ca_certificate"].read_bytes())
+        ar_ca_url = f"http://{host}:8000/drone-show/ar/hakoniwa-ar-ca.crt"
+        ar_ca_qr_path = write_viewer_qr(
+            viewer_access / "ar-ca-install-qr.svg", ar_ca_url
+        )
     plan = marker["flight_plan"]
     print("Virtual drone show extension configured")
     print(f"Environment            : {environment['mode']}")
@@ -898,6 +1196,11 @@ def configure(args: argparse.Namespace, experiment_path: Path, drone_root: Path)
     print(f"Show IR                : {show_ir_path}")
     print(f"Mobile Viewer URL      : {viewer_url}")
     print(f"Mobile Viewer QR       : {viewer_qr_path}")
+    if ar_url is not None:
+        print(f"AR Viewer URL          : {ar_url}")
+        print(f"AR Viewer QR           : {ar_qr_path}")
+        print(f"AR trust certificate   : {ar_ca_path}")
+        print(f"AR certificate QR      : {ar_ca_qr_path}")
     print(
         "Scenario               : takeoff -> "
         + " -> ".join(step["step_id"] for step in show_definition["timeline"])
@@ -966,6 +1269,8 @@ def main(argv: list[str] | None = None) -> int:
             return _open_viewer(
                 experiment_path, drone_count_override=args.drone_count
             )
+        if args.command == "open-ar":
+            return _open_ar_viewer(experiment_path)
         return base.smoke(
             experiment_path,
             args.timeout_sec,

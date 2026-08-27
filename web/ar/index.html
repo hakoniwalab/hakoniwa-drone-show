@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <title>Hakoniwa Drone Show AR</title>
+  <script async src="https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js"></script>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+  <link rel="stylesheet" href="./ar.css">
+</head>
+<body>
+  <video id="camera-feed" autoplay muted playsinline></video>
+  <div id="three-root"></div>
+
+  <header id="top-bar">
+    <div><span class="eyebrow">HAKONIWA</span><strong>AR</strong></div>
+    <span id="drone-count">0 / 0</span>
+    <span id="ar-state" data-state="initializing">準備中</span>
+  </header>
+
+  <section id="permission-card">
+    <h1>ARプレビュー</h1>
+    <p>カメラと現在地を起動時に一度だけ使用します。開始後は矢印の方向へiPhoneを向けてください。</p>
+    <button id="ar-start" type="button" disabled>カメラARを開始</button>
+    <p id="permission-detail" role="status"></p>
+  </section>
+
+  <button id="show-start" type="button" hidden disabled>ドローンショー開始</button>
+  <p id="ar-detail" role="status" hidden></p>
+
+  <button id="movement-toggle" type="button" hidden aria-pressed="false" aria-label="仮想移動を開く">移動</button>
+  <div id="movement-controls" hidden>
+    <div class="dpad">
+      <button type="button" data-camera-move="forward" aria-label="前進">▲</button>
+      <button type="button" data-camera-move="left" aria-label="左移動">◀</button>
+      <button type="button" data-camera-move="backward" aria-label="後退">▼</button>
+      <button type="button" data-camera-move="right" aria-label="右移動">▶</button>
+    </div>
+    <div class="altitude">
+      <button type="button" data-camera-move="up" aria-label="上昇">上</button>
+      <button type="button" data-camera-move="down" aria-label="下降">下</button>
+    </div>
+  </div>
+
+  <button id="distance-toggle" type="button" hidden aria-pressed="false">距離</button>
+
+  <div id="observer-position" hidden aria-live="polite">
+    <strong>初期位置から</strong>
+    <span id="observer-horizontal">前 0.0 m ／ 右 0.0 m</span>
+    <span id="observer-height">地面から 0.0 m</span>
+    <span id="nearest-drone-distance">最寄り機 --</span>
+  </div>
+
+  <div id="direction-guide" hidden aria-hidden="true">
+    <span id="direction-arrow" aria-hidden="true">➤</span>
+  </div>
+
+  <script type="module" src="./ar-app.mjs"></script>
+</body>
+</html>

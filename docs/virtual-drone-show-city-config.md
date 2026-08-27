@@ -111,7 +111,7 @@ Worldにおける中央離陸地点の高さへ合わせています。
 スマホ表示ではMacとスマホを同じLANへ接続し、`viewer.network.host`へMacのLAN IPを
 設定して`configure`を再実行します。`open-viewer`が表示するURLをスマホで開いてください。
 IPアドレスが変わった場合もYAMLを更新して再度`configure`します。このHTTP接続は現行
-ViewerのLAN疎通確認用です。カメラとWebXRを使うAR版では、後続TaskでHTTPS/WSSを追加します。
+ViewerのLAN疎通確認用です。カメラARは専用のHTTPS/WSS Gatewayを使用します。
 
 `configure`は同じURLを格納した次のファイルも生成します。Macで`viewer-qr.svg`を開き、
 スマホのカメラで読み取ると長いURLを入力せずにViewerを開けます。QR生成は同梱の純Python
@@ -121,6 +121,26 @@ encoderを使用するため、pip packageや外部Webサービスを必要と�
 work/recipes/drone-fleet-single-host/viewer-access/viewer-url.txt
 work/recipes/drone-fleet-single-host/viewer-access/viewer-qr.svg
 ```
+
+### `ar`
+
+| 項目 | 型・制約 | 説明 |
+|---|---|---|
+| `ar.enabled` | 真偽値 | カメラ重畳ARページとHTTPS/WSS Gatewayを有効にします。 |
+| `ar.venue.latitude` | -90〜90 | Showの会場基準緯度です。 |
+| `ar.venue.longitude` | -180〜180 | Showの会場基準経度です。 |
+| `ar.venue.heading_deg` | 有限数 | 地理ENUからShow ENUへの会場方位です。360度で正規化されます。 |
+| `ar.preview.location_source` | `device`または`override` | AR開始時の初期観客位置です。`device`はGPSを一度だけ取得します。 |
+| `ar.preview.override.latitude` | -90〜90 | 遠隔テスト用の仮想観客緯度です。 |
+| `ar.preview.override.longitude` | -180〜180 | 遠隔テスト用の仮想観客経度です。 |
+| `ar.preview.eye_height_m` | 0より大きく10以下 | 平面床から観客カメラまでの高さです。 |
+| `ar.preview.movement_speed_m_s` | 0より大きく100以下 | 折りたたみ式の仮想移動ボタンを押している間の移動速度です。 |
+| `ar.preview.device_orientation` | `off`または`optional` | `optional`はAR開始時に端末姿勢の利用許可を求め、yaw/pitchへ反映します。 |
+
+ARの初期位置は端末GPSまたは`override`から一度だけ計算し、必要な場合だけ画面右下から
+仮想位置を調整します。
+編隊中心への方向と距離はAR画面上のガイドへ表示されます。利用手順、証明書、操作方法は[カメラARプレビュー](ar-preview.md)を
+参照してください。
 
 ### `scenario`
 

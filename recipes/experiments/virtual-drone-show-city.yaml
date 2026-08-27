@@ -35,6 +35,21 @@ viewer:
     pitch_deg: 15.0
     fov_deg: 55.0
 
+ar:
+  enabled: true
+  venue:
+    latitude: 35.0988
+    longitude: 138.8587
+    heading_deg: 0.0
+  preview:
+    location_source: override
+    override:
+      latitude: 35.0985305
+      longitude: 138.8587
+    eye_height_m: 1.6
+    movement_speed_m_s: 5.0
+    device_orientation: optional
+
 scenario:
   show_file: ../../shows/kids-space-adventure.show.json
   formation:

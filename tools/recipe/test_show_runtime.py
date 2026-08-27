@@ -144,6 +144,43 @@ class ShowRuntimeTest(unittest.TestCase):
             self.assertEqual(assets["web-bridge-fleets"]["args"][1], str((root / "bridge").resolve()))
             self.assertEqual(assets["visual-state-publisher"]["args"], ["vsp.json"])
 
+    def test_launcher_adds_ar_https_and_wss_gateway(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            launcher_path = root / "launcher.json"
+            write_json(
+                launcher_path,
+                {"assets": [
+                    {"name": "show-runner", "args": ["old.py"], "env": {"set": {}}},
+                    {"name": "web-bridge-fleets", "args": ["--config-root", "old"]},
+                    {"name": "threejs-viewer-webserver", "command": "python3", "args": [], "cwd": str(root / "web")},
+                ]},
+            )
+            runner = root / "runner.py"
+            gateway = root / "gateway.py"
+            certificate = root / "server.crt"
+            private_key = root / "server.key"
+            for path in (runner, gateway, certificate, private_key):
+                path.touch()
+            show_runtime.patch_launcher(
+                launcher_path,
+                show_runner=runner,
+                drone_root=root / "drone",
+                bridge_config_root=root / "bridge",
+                ar_gateway=gateway,
+                ar_certificate=certificate,
+                ar_private_key=private_key,
+            )
+            assets = {
+                asset["name"]: asset
+                for asset in json.loads(launcher_path.read_text())["assets"]
+            }
+            ar = assets["ar-https-gateway"]
+            self.assertEqual(ar["command"], "python3")
+            self.assertEqual(ar["cwd"], str(root / "web"))
+            self.assertIn("8443", ar["args"])
+            self.assertIn("8766", ar["args"])
+
     def test_show_ir_speed_limit_is_validated_against_timeline(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             show_ir = Path(temporary) / "show-ir.json"
@@ -225,7 +262,22 @@ class ShowRuntimeTest(unittest.TestCase):
                                 "scale": 2.0,
                                 "intensity": 1.75,
                             },
-                        }
+                        },
+                        "ar": {
+                            "enabled": True,
+                            "venue": {
+                                "latitude": 35.0,
+                                "longitude": 138.0,
+                                "heading_deg": 0.0,
+                            },
+                            "preview": {
+                                "location_source": "device",
+                                "override": None,
+                                "eye_height_m": 1.6,
+                                "movement_speed_m_s": 5.0,
+                                "device_orientation": "optional",
+                            },
+                        },
                     },
                     "city_world": {
                         "origin": {
@@ -269,6 +321,12 @@ class ShowRuntimeTest(unittest.TestCase):
             )
             self.assertEqual(
                 runtime["led_appearance"], {"scale": 2.0, "intensity": 1.75}
+            )
+            self.assertTrue(runtime["ar"]["enabled"])
+            self.assertEqual(runtime["ar"]["ground_height_m"], 0.0)
+            self.assertEqual(
+                runtime["ar"]["secure_websocket_url"],
+                "wss://192.168.1.23:8443/pdu",
             )
             self.assertEqual(
                 runtime["camera"],

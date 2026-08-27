@@ -15,11 +15,11 @@ DroneとLEDだけを重畳するARサイトプレビューを実現する。PLAT
 ```text
 Show File / SVG
        ↓ configure
-Show IR + 軽量MuJoCo World
+Show IR + 平面MuJoCo World
        ↓
 現行Show Runner / PDU Bridge
        ↓
-AR専用Web UI
+カメラ重畳AR専用Web UI
        ↓
 カメラ映像 + Drone GLB + LED
 ```
@@ -29,18 +29,18 @@ City版とAR版は同じShow Fileを使用できる。
 ```text
                     ┌─ City Runtime: PLATEAU + MuJoCo都市 + Three.js
 Show File / Show IR ┤
-                    └─ AR Runtime: 軽量World + WebXR + Drone/LED
+                    └─ AR Runtime: 平面World + Camera Overlay + Drone/LED
 ```
 
 ## リポジトリ境界
 
 ### `hakoniwa-drone-show`
 
-- AR専用HTML、UI、WebXRセッション
+- AR専用HTML、UI、カメラ重畳表示
 - AR用Recipeおよびexperiment
 - Show IR、Show Status、Visual State PDUとの接続
 - 会場位置、仮想観客位置、方位、縮尺、高度の設定
-- 地面への原点配置とAR座標変換
+- 初回GPS、テスト位置、会場方位とAR座標変換
 - AR設定Schema、validation、テスト、利用手順
 
 ### `hakoniwa-threejs-drone`
@@ -61,7 +61,10 @@ Show File / Show IR ┤
 - Droneの位置は現行Visual State PDUを正本とする
 - LEDは現行Show IRとShow Statusの`show_frame_index`へ同期する
 - 初期PoCではPDU定義、チャネル数、送信周期を変更しない
-- AR機能は専用ページと専用Recipeで追加し、既存City Viewerをデグレさせない
+- AR機能は専用ページで追加し、既存Viewerをデグレさせない
+- GPSは初期位置計算時だけ取得し、継続追跡しない
+- 初期位置決定後の観客移動はアプリ内の仮想ENU移動とする
+- 端末姿勢は位置を変更せず、任意でyaw/pitchへ加算する
 - 緯度経度だけでAR空間の床や方位が確定するとは扱わない
 - AR表示は演出・視認性確認用であり、実機運航の安全証明とは扱わない
 
@@ -104,9 +107,10 @@ ar:
 
 ### AR原点
 
-初期PoCではWebXR Hit Testを使い、画面上で地面をタップしてAR原点を確定する。
-緯度経度から求めた会場と観客の相対ENU位置を、そのローカル原点と手動または設定済み
-方位へ対応付ける。
+初期PoCでは会場と観客の緯度経度差を地理ENUへ変換し、`venue.heading_deg`でShow ENUへ
+対応付ける。観客のUpは平面床と`eye_height_m`から決定する。地面Hit Testや歩行追跡は
+行わず、位置はYAMLの初期設定を維持する。yaw/pitchは任意の端末姿勢を利用し、編隊の
+方向と距離は画面上のガイドで案内する。
 
 ## 段階的な実装方針
 
@@ -116,13 +120,13 @@ ar:
 ```text
 AR-0: 現行City Viewerをスマホから表示
   ↓
-AR-1: 同じ構成のARページを追加し、背景を透明化
+AR-1: iPhone/Android共通のカメラ重畳ARページ
   ↓
-AR-2: ブラウザ側からPLATEAU、Leaflet、都市GLBを除去
+AR-2: 初回GPS + 任意の端末姿勢 + 編隊方向ガイド
   ↓
-AR-3: MuJoCo側から都市mesh/colliderを除去
+AR-3: HTTPS/WSSでiPhone実機確認
   ↓
-AR-4: 会場位置、仮想観客位置、配置調整
+AR-4: 必要に応じてAndroid WebXRを追加
 ```
 
 ## Task AR-0: 現行Viewerのスマホ表示
@@ -136,7 +140,7 @@ AR-4: 会場位置、仮想観客位置、配置調整
 - [x] configureでスマホ向けURLのQRコードを生成する
 - [x] LAN上のHTTPでもShow IRのSHA-256を検証できるfallbackを追加する
 - [x] スマートフォンの観客視点で1本指yaw/pitch・ピンチFOVを操作できるようにする
-- [x] PC・スマートフォン共通で、観客位置を固定できる移動操作OFFと前後左右・上下の半透明ボタンを追加する
+- [x] AR鑑賞を妨げないよう、常設パネルを廃止し、仮想移動だけを小さな開閉ボタンへ収める
 - [x] この段階ではCity World、PLATEAU、Viewer UI、PDU周期を変更しない
 
 ### Acceptance Test
@@ -164,75 +168,80 @@ AR-4: 会場位置、仮想観客位置、配置調整
 - [ ] 機体が指定した床面から離陸し、5 Formationとrole別LEDを最後まで再生できる
 - [ ] `plateau`へ戻した場合に従来City World構成を生成できる
 
-## Task AR-1: 都市付き構成のAR化
+## Task AR-1: 共通カメラ重畳AR
 
 ### 実装
 
-- [ ] AR対応状況を`immersive-ar`のfeature detectionで判定する
-- [ ] Three.jsのARセッションを開始・終了できる最小ページを追加する
-- [ ] 既存Viewerと同じruntime設定、Drone、LED、PDU接続をARページで再利用する
-- [ ] rendererとscene背景をAR向けに透明化し、カメラ映像を背景として表示する
-- [ ] この段階ではPLATEAU読込経路を残し、既存構成との差分をAR表示だけに限定する
-- [ ] HTTPS Gatewayから静的ファイルを配信し、既存WebSocketをWSSで中継する
-- [ ] HTTPSと証明書を含む端末確認手順を整理する
-- [ ] WebXR非対応時に、対応端末・ブラウザが必要であることを画面表示する
+- [x] WebXRへ依存しないiPhone/Android共通のAR専用ページを追加する
+- [x] 背面カメラ映像を全面表示する
+- [x] Three.js rendererとscene背景を透明化する汎用APIを追加する
+- [x] 既存Viewerと同じruntime設定、Drone、LED、PDU接続をARページで再利用する
+- [x] PLATEAU、Leaflet、都市GLBをARページから読み込まない
+- [x] Show開始とShow Statusを既存PDU channelで再利用する
 
 ### Acceptance Test
 
-- [ ] 対応端末でARセッションを開始・終了できる
+- [ ] iPhone SafariでカメラARを開始・終了できる
 - [ ] カメラ映像上で180機とrole別LEDを確認できる
-- [ ] ARページと従来City ViewerでDrone位置とLED状態が一致する
-- [ ] 非対応ブラウザで通常Viewerを壊さず、明確な案内を表示できる
+- [ ] ARページと通常ViewerでDrone位置とLED状態が一致する
+- [ ] カメラ権限拒否時に通常Viewerを壊さず、明確な案内を表示できる
 
-## Task AR-2: ブラウザ側PLATEAUの除去
-
-### 実装
-
-- [ ] AR専用ページを追加し、PLATEAU、Leaflet、都市GLBを読み込まない
-- [ ] Drone GLB、LED、Show UI、WebSocket/PDU接続だけを残す
-- [ ] City版とAR版のruntime設定を分け、City版の生成物を変更しない
-
-### Acceptance Test
-
-- [ ] PLATEAU、Leaflet、都市GLBへのHTTP requestが発生しない
-- [ ] 都市描画を外した前後でDrone位置、時間、role別LEDが一致する
-- [ ] 現実のカメラ背景、Drone、LED以外の都市描画が表示されない
-
-## Task AR-3: MuJoCo都市データの除去
+## Task AR-2: 初回位置・端末姿勢・編隊方向ガイド
 
 ### 実装
 
-- [ ] groundとDroneを基本とする軽量MuJoCo Worldを生成するAR用Recipeを追加する
-- [ ] AR版configureからCity World Receipt依存を外す
-- [ ] City版と同じShow FileをAR版でも選択できるようにする
+- [x] `venue.latitude`、`venue.longitude`、`venue.heading_deg`を定義する
+- [x] 起動時に端末GPSを一度だけ取得する
+- [x] `device`失敗時は`override`へfallbackし、遠隔テストではYAMLで`override`を選べるようにする
+- [x] 会場と観客の緯度経度差をローカルENUへ変換する
+- [x] YAMLで決めた初期位置から、折りたたみ式ボタンで前後左右・上下へ仮想移動できる
+- [x] `device_orientation: optional`ならAR開始操作から端末姿勢をyaw/pitchへ反映する
+- [x] Visual Stateの全機実位置から編隊中心を求める
+- [x] Visual State受信前はShow IRの編隊中心を方向案内に使用する
+- [x] 視野外では画面端の矢印で編隊方向を表示し、視野内では中央マーカーを消す
+- [x] 左上の距離ボタンで編隊中心までの距離を表示・非表示できる
+- [x] 左下に初期位置基準の前後左右、地面からの高さ、最寄り機までの距離を表示する
+- [x] 端末を上へ向ける操作とpitchを一致させ、遠距離ほど端末姿勢の手ぶれ補正を強くする
 
 ### Acceptance Test
 
-- [ ] AR版のconfigureと起動にCity World Receiptが不要である
-- [ ] MuJoCo runtimeへ都市meshおよび都市colliderが含まれない
-- [ ] 180機の子供向けショーをAR表示できる
-- [ ] ネコからAIロボットまで位置、時間、role別LEDがCity版と一致する
-- [ ] 既存City版と旧Viewerのテストが継続して成功する
+- [ ] 実際の会場位置で端末GPSから初期観客位置を計算できる
+- [ ] 福井から静岡の`override`位置を使って表示できる
+- [ ] iPhoneを向けると方向矢印が視野内マーカーへ変わる
+- [ ] 端末姿勢がyaw/pitchへ反映され、`off`設定では固定できる
 
-## Task AR-4: 会場配置と仮想位置
+## Task AR-3: iPhone向けHTTPS/WSS
 
 ### 実装
 
-- [ ] `venue.latitude`、`venue.longitude`、`venue.heading_deg`を定義する
-- [ ] 観客位置の`device`と`override`を切り替えられるようにする
-- [ ] UIで仮想緯度経度と方位を変更できるようにする
-- [ ] 会場と観客の緯度経度差をローカルENUへ変換する
-- [ ] Hit Testによる地面タップでAR原点を確定する
-- [ ] scale、heading、show altitudeをAR画面で微調整できるようにする
-- [ ] 調整値をYAML形式でコピーできるようにする
-- [ ] 最後に使用したpreview設定を端末ローカルへ保存できるようにする
+- [x] configureで再利用可能なローカルCAとIP SAN付き証明書を生成する
+- [x] HTTPS `:8443`でAR静的ファイルを配信する
+- [x] 同一オリジンのWSS `:8443/pdu`を既存WebBridge `ws://127.0.0.1:8765`へ中継する
+- [x] 診断・互換用のWSS `:8766`も維持する
+- [x] AR URL、QR、CA証明書、CA導入QRを生成する
+- [x] CA秘密鍵とサーバー秘密鍵を生成workspaceだけに置く
+- [x] iPhoneへのCA導入と信頼設定を文書化する
 
 ### Acceptance Test
 
-- [ ] 福井から静岡会場の仮想観客位置を指定してプレビューできる
-- [ ] `device`と`override`で同じ座標を指定した場合に同じ配置結果となる
-- [ ] 観客位置を東西南北へ動かすと、会場の相対方向が正しく変化する
-- [ ] 方位と縮尺を変更してもShow IR自体は変更されない
+- [ ] iPhone SafariからHTTPS AR URLを開ける
+- [ ] 証明書信頼後にカメラとGeolocationを許可できる
+- [ ] WSS経由で180機とShow Statusを受信できる
+- [ ] 通常HTTP Viewerと既存`ws://8765`が継続して利用できる
+
+## Task AR-4: Android WebXR（将来・任意）
+
+### 実装
+
+- [ ] `immersive-ar`のfeature detectionを追加する
+- [ ] Android対応端末ではWebXR sessionへ切り替えられるようにする
+- [ ] Camera OverlayとDrone/LED/PDUコードを共通利用する
+- [ ] WebXR固有のHit Testと空間trackingが商品ユースケースに必要か再評価する
+
+### Acceptance Test
+
+- [ ] WebXR非対応時もCamera Overlay版が継続して動く
+- [ ] WebXR追加前後でShow IR、PDU、LEDの結果が一致する
 
 ## Task AR-5: 商品化に向けた互換性
 

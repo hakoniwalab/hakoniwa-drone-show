@@ -1,0 +1,212 @@
+:root {
+  color-scheme: dark;
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #eef7ff;
+  background: #02040a;
+}
+* { box-sizing: border-box; }
+html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+button { font: inherit; }
+#camera-feed, #three-root {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+#camera-feed { z-index: 0; object-fit: cover; background: #02040a; }
+#three-root { z-index: 1; background: transparent; pointer-events: auto; }
+#three-root canvas { background: transparent !important; }
+#top-bar {
+  position: fixed;
+  z-index: 20;
+  top: max(10px, env(safe-area-inset-top));
+  left: 12px;
+  right: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 9px;
+  border: 1px solid rgb(255 255 255 / 22%);
+  border-radius: 12px;
+  background: rgb(4 10 22 / 66%);
+  backdrop-filter: blur(12px);
+}
+#top-bar div { display: grid; gap: 1px; }
+.eyebrow { color: #67e8f9; font-size: 9px; letter-spacing: .22em; }
+#top-bar strong { font-size: 12px; }
+#drone-count { color: #cbd5e1; font-size: 10px; font-variant-numeric: tabular-nums; }
+#ar-state { padding: 5px 9px; border-radius: 999px; background: #334155; font-size: 11px; font-weight: 700; }
+#ar-state[data-state="ready"] { background: #166534; }
+#ar-state[data-state="failed"] { background: #991b1b; }
+#permission-card {
+  position: fixed;
+  z-index: 30;
+  top: 50%;
+  left: 50%;
+  width: min(88vw, 390px);
+  transform: translate(-50%, -50%);
+  padding: 22px;
+  border: 1px solid #385174;
+  border-radius: 16px;
+  background: rgb(7 16 31 / 94%);
+  box-shadow: 0 18px 60px rgb(0 0 0 / 45%);
+}
+#permission-card h1 { margin: 0 0 10px; font-size: 23px; }
+#permission-card p { color: #aebed4; font-size: 13px; line-height: 1.6; }
+#permission-card button {
+  width: 100%;
+  min-height: 48px;
+  border: 0;
+  border-radius: 10px;
+  color: #05202b;
+  background: linear-gradient(135deg, #67e8f9, #38bdf8);
+  font-weight: 800;
+}
+#permission-card button:disabled { color: #718198; background: #263244; }
+#permission-detail { min-height: 1.4em; margin-bottom: 0; color: #fda4af; font-size: 11px; }
+#show-start {
+  position: fixed;
+  z-index: 22;
+  left: 50%;
+  bottom: max(14px, env(safe-area-inset-bottom));
+  width: min(68vw, 250px);
+  min-height: 42px;
+  transform: translateX(-50%);
+  border: 0;
+  border-radius: 999px;
+  color: #05202b;
+  background: linear-gradient(135deg, #67e8f9, #38bdf8);
+  box-shadow: 0 5px 20px rgb(0 0 0 / 36%);
+  font-size: 12px;
+  font-weight: 800;
+}
+#show-start[hidden] { display: none; }
+#show-start:disabled { color: #94a3b8; background: rgb(30 41 59 / 78%); }
+#movement-toggle {
+  position: fixed;
+  z-index: 27;
+  right: max(12px, env(safe-area-inset-right));
+  bottom: max(14px, env(safe-area-inset-bottom));
+  width: 46px;
+  height: 46px;
+  padding: 0;
+  border: 1px solid rgb(255 255 255 / 45%);
+  border-radius: 50%;
+  color: #e0f2fe;
+  background: rgb(4 10 22 / 55%);
+  font-size: 10px;
+  font-weight: 750;
+  backdrop-filter: blur(8px);
+}
+#movement-toggle[hidden] { display: none; }
+#movement-toggle[aria-pressed="true"] { color: #05202b; background: #67e8f9; }
+#movement-controls {
+  position: fixed;
+  z-index: 26;
+  right: max(10px, env(safe-area-inset-right));
+  bottom: calc(max(14px, env(safe-area-inset-bottom)) + 54px);
+  display: flex;
+  align-items: end;
+  gap: 5px;
+  padding: 6px;
+  border-radius: 14px;
+  background: rgb(4 10 22 / 28%);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+#movement-controls[hidden] { display: none; }
+.dpad { display: grid; grid-template-columns: repeat(3, 40px); grid-template-rows: repeat(2, 40px); }
+.dpad [data-camera-move="forward"] { grid-column: 2; grid-row: 1; }
+.dpad [data-camera-move="left"] { grid-column: 1; grid-row: 2; }
+.dpad [data-camera-move="backward"] { grid-column: 2; grid-row: 2; }
+.dpad [data-camera-move="right"] { grid-column: 3; grid-row: 2; }
+.altitude { display: grid; gap: 3px; }
+#movement-controls button {
+  width: 36px;
+  height: 36px;
+  margin: 2px;
+  padding: 0;
+  border: 1px solid rgb(255 255 255 / 48%);
+  border-radius: 50%;
+  color: rgb(255 255 255 / 94%);
+  background: rgb(5 9 20 / 38%);
+  font-size: 13px;
+  font-weight: 750;
+  touch-action: none;
+}
+#movement-controls button[data-active="true"] { color: #05202b; background: rgb(103 232 249 / 78%); }
+.altitude button { font-size: 10px; }
+#ar-detail {
+  position: fixed;
+  z-index: 22;
+  left: 50%;
+  bottom: calc(max(14px, env(safe-area-inset-bottom)) + 50px);
+  max-width: min(82vw, 420px);
+  margin: 0;
+  transform: translateX(-50%);
+  padding: 6px 10px;
+  border-radius: 999px;
+  color: #dbeafe;
+  background: rgb(4 10 22 / 70%);
+  font-size: 10px;
+  text-align: center;
+  backdrop-filter: blur(8px);
+}
+#ar-detail[hidden] { display: none; }
+#direction-guide {
+  position: fixed;
+  z-index: 24;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  filter: drop-shadow(0 2px 5px rgb(0 0 0 / 85%));
+}
+#direction-guide[hidden] { display: none; }
+#direction-arrow {
+  display: block;
+  color: #67e8f9;
+  font-size: 34px;
+  line-height: 1;
+  transform-origin: center;
+}
+#distance-toggle {
+  position: fixed;
+  z-index: 25;
+  top: calc(max(10px, env(safe-area-inset-top)) + 58px);
+  left: 12px;
+  min-width: 48px;
+  min-height: 30px;
+  padding: 4px 9px;
+  border: 1px solid rgb(255 255 255 / 28%);
+  border-radius: 999px;
+  color: #dbeafe;
+  background: rgb(4 10 22 / 62%);
+  font-size: 10px;
+  font-weight: 750;
+  white-space: nowrap;
+  backdrop-filter: blur(8px);
+}
+#distance-toggle[hidden] { display: none; }
+#distance-toggle[aria-pressed="true"] { color: #05202b; background: #67e8f9; }
+#observer-position {
+  position: fixed;
+  z-index: 25;
+  left: max(12px, env(safe-area-inset-left));
+  bottom: max(14px, env(safe-area-inset-bottom));
+  display: grid;
+  gap: 2px;
+  padding: 7px 9px;
+  border: 1px solid rgb(255 255 255 / 22%);
+  border-radius: 10px;
+  color: #dbeafe;
+  background: rgb(4 10 22 / 62%);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  backdrop-filter: blur(8px);
+}
+#observer-position[hidden] { display: none; }
+#observer-position strong { color: #67e8f9; font-size: 9px; }

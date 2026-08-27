@@ -136,6 +136,38 @@ scenario:
         self.assertIn("setAudienceCameraMovementInput", app)
         self.assertIn("setCameraMovementEnabled", app)
 
+    def test_ar_page_uses_camera_overlay_and_direction_guide(self) -> None:
+        ar_root = recipe.SHOW_ROOT / "web" / "ar"
+        page = (ar_root / "index.html").read_text(encoding="utf-8")
+        app = (ar_root / "ar-app.mjs").read_text(encoding="utf-8")
+        self.assertIn('id="camera-feed"', page)
+        self.assertIn('id="three-root"', page)
+        self.assertIn('id="ar-start" type="button" disabled', page)
+        self.assertIn('id="direction-guide" hidden', page)
+        self.assertIn('id="distance-toggle" type="button" hidden', page)
+        self.assertIn('id="observer-position" hidden', page)
+        self.assertIn('id="direction-arrow"', page)
+        self.assertNotIn('id="ar-panel"', page)
+        self.assertIn('id="movement-toggle"', page)
+        for movement in ("forward", "backward", "left", "right", "up", "down"):
+            self.assertIn(f'data-camera-move="{movement}"', page)
+        self.assertIn("navigator.mediaDevices.getUserMedia", app)
+        self.assertIn("navigator.geolocation.getCurrentPosition", app)
+        self.assertIn("transparentBackground = true", app)
+        self.assertIn("setAudienceCameraPose", app)
+        self.assertIn("requestDeviceOrientationPermission", app)
+        self.assertIn("centroidEnuFromDroneStates", app)
+        self.assertIn("directionGuide", app)
+        self.assertIn("smoothOrientationPose", app)
+        self.assertIn("directionDistanceVisible", app)
+        self.assertIn("relativeObserverPosition", app)
+        self.assertIn("nearestDroneDistance", app)
+        self.assertLess(
+            app.index("ui.arStart.disabled = false"),
+            app.index("await loadShowIr()"),
+        )
+        self.assertIn("await viewerReady", app)
+
     def test_default_sources_use_sibling_repositories(self) -> None:
         self.assertEqual(
             recipe.BUSINESS_PACK_ROOT,
@@ -179,6 +211,30 @@ scenario:
             recipe.DEFAULT_EXPERIMENT
         )
         self.assertNotIn("viewer", compatible)
+        self.assertNotIn("ar", compatible)
+        ar = recipe._ar_settings(recipe.DEFAULT_EXPERIMENT)
+        self.assertTrue(ar["enabled"])
+        self.assertEqual(ar["preview"]["location_source"], "override")
+        self.assertIsNotNone(ar["preview"]["override"])
+
+    def test_ar_override_is_required_for_override_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            experiment = Path(temporary) / "experiment.yaml"
+            experiment.write_text(
+                """ar:
+  enabled: true
+  venue:
+    latitude: 35.0
+    longitude: 138.0
+  preview:
+    location_source: override
+""",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(
+                recipe.base.RecipeError, "override is required"
+            ):
+                recipe._ar_settings(experiment)
 
     def test_audience_camera_rejects_unsupported_pitch(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -539,6 +595,7 @@ scenario:
                         "initial_mode": "free",
                         "network": {"host": "192.168.1.23"},
                     },
+                    "ar": {"enabled": False},
                     "show_definition": {
                         "path": str(
                             recipe.SHOW_ROOT / "shows" / "three-face.show.json"
