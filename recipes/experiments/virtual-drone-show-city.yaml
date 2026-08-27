@@ -30,14 +30,14 @@ viewer:
     host: 192.168.11.47
   initial_mode: audience
   led_appearance:
-    scale: 1.45
-    intensity: 1.25
+    scale: 1.0
+    intensity: 1.0
     spatial_depth_cue: true
   audience_camera:
-    position_m: [0.0, -30.0, 6.0]
-    yaw_deg: 90.0
-    pitch_deg: 15.0
-    fov_deg: 55.0
+    position_m: [12.42, -37.79, 6.00]
+    yaw_deg: 114.93
+    pitch_deg: 24.92
+    fov_deg: 76.43
 
 ar:
   enabled: true
@@ -58,7 +58,7 @@ scenario:
   show_file: ../../shows/kids-space-adventure.show.json
   formation:
     scale_m: 20
-    depth_m: 3.0
+    depth_m: 10.0
     audience_tilt_deg: -60.0
   altitude_m: 10.0
   max_speed_m_s: 20.0
