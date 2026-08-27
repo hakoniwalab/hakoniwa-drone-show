@@ -864,6 +864,108 @@ def build_process_models(
     return aggregate
 
 
+def build_flat_shared_model(
+    *,
+    drone_root: Path,
+    drone_count: int,
+    output_dir: Path,
+    ground_height_m: float,
+    origin: dict[str, float],
+    drone_ids: list[int] | None = None,
+) -> dict[str, Any]:
+    """Build a fleet-only MuJoCo model with one flat ground plane."""
+    if not 1 <= drone_count <= 200:
+        raise FleetMujocoError("drone_count must be in [1, 200]")
+    if not math.isfinite(ground_height_m):
+        raise FleetMujocoError("ground_height_m must be finite")
+    output_dir = output_dir.expanduser().resolve()
+    output_dir.mkdir(parents=True, exist_ok=True)
+    model_xml = output_dir / "flat-fleet.xml"
+    model_mjb = output_dir / "flat-fleet.mjb"
+    _generate_base_fleet_xml(drone_root, drone_count, model_xml)
+    fleet = _prepare_base_fleet_xml(
+        model_xml, drone_count, drone_ids=drone_ids
+    )
+    tree = ET.parse(model_xml)
+    ground = tree.find("./worldbody/geom[@name='ground']")
+    if ground is None:
+        raise FleetMujocoError("generated fleet MJCF has no ground plane")
+    ground.set("pos", f"0 0 {ground_height_m:.12g}")
+    ground.set("size", "1000 1000 .01")
+    ET.indent(tree, space="  ")
+    tree.write(model_xml, encoding="utf-8", xml_declaration=True)
+    try:
+        compiled = compile_mujoco_xml(
+            model_xml, model_mjb, find_mujoco_library(drone_root)
+        )
+    except (MujocoCompileError, ET.ParseError) as exc:
+        raise FleetMujocoError(str(exc)) from exc
+    receipt = {
+        "schema_version": 1,
+        "component": "drone-fleet-mujoco-flat",
+        "scope": "non-ICRA drone-fleet-single-host",
+        "drone_count": drone_count,
+        "local_drone_count": len(fleet["drone_body_names"]),
+        "drone_ids": drone_ids or list(range(1, drone_count + 1)),
+        "process_count_contract": 1,
+        "environment": {
+            "mode": "flat",
+            "ground_height_m": ground_height_m,
+            "origin": origin,
+        },
+        "fleet": fleet,
+        "model_size": MODEL_SIZE,
+        "collision_contract": {
+            "ground": {"contype": "1", "conaffinity": "1"},
+            "drone": DRONE_COLLISION_MASK,
+            "ground_to_drone": "enabled",
+            "drone_to_drone": "disabled",
+        },
+        "compiled_model": compiled,
+    }
+    (output_dir / "receipt.json").write_text(
+        json.dumps(receipt, indent=2) + "\n", encoding="utf-8"
+    )
+    return receipt
+
+
+def build_flat_process_models(
+    *,
+    drone_root: Path,
+    drone_count: int,
+    process_count: int,
+    output_dir: Path,
+    ground_height_m: float,
+    origin: dict[str, float],
+) -> dict[str, Any]:
+    process_models = [
+        build_flat_shared_model(
+            drone_root=drone_root,
+            drone_count=drone_count,
+            output_dir=output_dir / f"process-{process_index:02d}",
+            ground_height_m=ground_height_m,
+            origin=origin,
+            drone_ids=drone_ids,
+        )
+        for process_index, drone_ids in enumerate(
+            _partition_drone_ids(drone_count, process_count), start=1
+        )
+    ]
+    aggregate = {
+        "schema_version": 1,
+        "component": "drone-fleet-mujoco-flat-process-models",
+        "scope": "non-ICRA drone-fleet-single-host",
+        "drone_count": drone_count,
+        "process_count": process_count,
+        "environment": process_models[0]["environment"],
+        "process_models": process_models,
+    }
+    (output_dir / "receipt.json").write_text(
+        json.dumps(aggregate, indent=2) + "\n", encoding="utf-8"
+    )
+    return aggregate
+
+
 def materialize_fleet_config(
     *,
     drone_root: Path,
@@ -1211,6 +1313,255 @@ def configure_single_host_fleet(
         spawn_spacing_m=spawn_spacing_m,
         altitude_mode=altitude_mode,
         above_city_clearance_m=above_city_clearance_m,
+        formation_rotation_deg=formation_rotation_deg,
+        formation_tilt_deg=formation_tilt_deg,
+    )
+
+
+def materialize_flat_fleet_config(
+    *,
+    drone_root: Path,
+    recipe_config: Path,
+    model_receipt: dict[str, Any],
+    spawn_altitude_m: float,
+    spawn_spacing_m: float,
+    flight_altitude_agl_m: float,
+    formation_rotation_deg: float,
+    formation_tilt_deg: float,
+) -> dict[str, Any]:
+    """Replace the generic fleet with a shared flat-ground MuJoCo fleet."""
+    if not 0.18 <= spawn_altitude_m <= 2.0:
+        raise FleetMujocoError(
+            "spawn_altitude_m must be between 0.18 and 2.0"
+        )
+    spawn_spacing_m = _validate_spawn_spacing(spawn_spacing_m)
+    if not math.isfinite(flight_altitude_agl_m) or flight_altitude_agl_m < 0.5:
+        raise FleetMujocoError("flat flight altitude must be at least 0.5 m AGL")
+    if not math.isfinite(formation_rotation_deg):
+        raise FleetMujocoError("formation_rotation_deg must be finite")
+    if not math.isfinite(formation_tilt_deg) or not -85.0 <= formation_tilt_deg <= 85.0:
+        raise FleetMujocoError("formation_tilt_deg must be in [-85, 85]")
+
+    drone_root = drone_root.expanduser().resolve()
+    recipe_config = recipe_config.expanduser().resolve()
+    drone_count = int(model_receipt["drone_count"])
+    process_count = int(model_receipt.get("process_count", 1))
+    process_models = model_receipt.get("process_models")
+    environment = model_receipt.get("environment")
+    if not isinstance(process_models, list) or len(process_models) != process_count:
+        raise FleetMujocoError("flat process model count is invalid")
+    if not isinstance(environment, dict):
+        raise FleetMujocoError("flat environment receipt is missing")
+    origin = environment.get("origin")
+    if not isinstance(origin, dict):
+        raise FleetMujocoError("flat environment origin is missing")
+    ground_height_m = float(environment["ground_height_m"])
+    first_compiled = process_models[0].get("compiled_model")
+    if not isinstance(first_compiled, dict):
+        raise FleetMujocoError("flat compiled model receipt is missing")
+    model_path = Path(str(first_compiled.get("output_mjb", ""))).resolve()
+    if not model_path.is_file():
+        raise FleetMujocoError(f"compiled flat MJB not found: {model_path}")
+
+    source_type = (
+        drone_root / "config" / "drone" / "fleets" / "types" / "api-mujoco.json"
+    )
+    if not source_type.is_file():
+        raise FleetMujocoError(f"MuJoCo Drone type config not found: {source_type}")
+    type_relative = Path("config/drone/fleets/types/api-mujoco-flat.json")
+    type_output = recipe_config / type_relative.relative_to("config")
+    type_output.parent.mkdir(parents=True, exist_ok=True)
+    type_config = json.loads(source_type.read_text(encoding="utf-8"))
+    type_config["name"] = "api-mujoco-flat"
+    type_config["components"]["droneDynamics"]["mujoco"]["modelPath"] = str(
+        model_path
+    )
+    location = type_config["simulation"]["location"]
+    location["latitude"] = float(origin["latitude"])
+    location["longitude"] = float(origin["longitude"])
+    location["altitude"] = float(origin["altitude_offset_m"])
+    type_output.write_text(
+        json.dumps(type_config, indent=2) + "\n", encoding="utf-8"
+    )
+
+    fleet = recipe_config / "drone" / "fleets" / "api-current.json"
+    service = recipe_config / "drone" / "fleets" / "services" / "api-current-service.json"
+    pdudef = recipe_config / "pdudef" / "drone-pdudef-current.json"
+    generator = drone_root / "tools" / "gen_fleet_scale_config.py"
+    body_origin_height_m = ground_height_m + spawn_altitude_m
+    command = [
+        sys.executable,
+        str(generator),
+        "--drone-count",
+        str(drone_count),
+        "--fleet-path",
+        str(fleet),
+        "--pdudef-path",
+        str(pdudef),
+        "--service-config-path",
+        "config/drone/fleets/services/api-current-service.json",
+        "--service-out-path",
+        str(service),
+        "--type-name",
+        "api-mujoco-flat",
+        "--type-config-path",
+        str(type_relative),
+        "--enable-mujoco-overrides",
+        "--layout",
+        "packed-rings",
+        "--center-z",
+        str(-body_origin_height_m),
+    ]
+    if subprocess.run(command, cwd=recipe_config.parent, check=False).returncode != 0:
+        raise FleetMujocoError("flat MuJoCo fleet config generation failed")
+
+    candidates = _candidate_spawn_centers(
+        {"north_south": 40.0, "east_west": 40.0},
+        spacing_m=spawn_spacing_m,
+    )
+    if len(candidates) < drone_count:
+        raise FleetMujocoError("flat ground cannot allocate all launch points")
+    fleet_config = json.loads(fleet.read_text(encoding="utf-8"))
+    drones = fleet_config.get("drones")
+    if not isinstance(drones, list) or len(drones) != drone_count:
+        raise FleetMujocoError("generated flat fleet drone count is invalid")
+    spawn_points = []
+    for drone, (x_m, y_m) in zip(drones, candidates):
+        drone["position_meter"] = [x_m, y_m, -body_origin_height_m]
+        spawn_points.append(
+            {
+                "x_m": x_m,
+                "y_m": y_m,
+                "ground_height_m": ground_height_m,
+                "body_origin_height_m": body_origin_height_m,
+            }
+        )
+    fleet.write_text(json.dumps(fleet_config, indent=2) + "\n", encoding="utf-8")
+
+    process_type_configs: list[str] = []
+    if process_count > 1:
+        splitter = drone_root / "tools" / "gen_fleet_split_config.py"
+        split_command = [
+            sys.executable,
+            str(splitter),
+            "--fleet-in",
+            str(fleet),
+            "--service-in",
+            str(service),
+            "--fleet-out-template",
+            str(recipe_config / "drone" / "fleets" / "api-current-part{part}.json"),
+            "--service-out-template",
+            str(recipe_config / "drone" / "fleets" / "services" / "api-current-service-part{part}.json"),
+            "--shared-service-config-path",
+            "config/drone/fleets/services/api-current-service.json",
+            "--parts",
+            str(process_count),
+        ]
+        if subprocess.run(split_command, cwd=recipe_config.parent, check=False).returncode != 0:
+            raise FleetMujocoError("flat MuJoCo fleet partition generation failed")
+        for process_index, process_model in enumerate(process_models, start=1):
+            compiled = process_model.get("compiled_model")
+            if not isinstance(compiled, dict):
+                raise FleetMujocoError(
+                    f"flat process {process_index} compiled model is missing"
+                )
+            process_model_path = Path(str(compiled.get("output_mjb", ""))).resolve()
+            if not process_model_path.is_file():
+                raise FleetMujocoError(
+                    f"flat process {process_index} MJB not found: {process_model_path}"
+                )
+            process_type_relative = Path(
+                f"config/drone/fleets/types/api-mujoco-flat-part{process_index}.json"
+            )
+            process_type_output = recipe_config / process_type_relative.relative_to(
+                "config"
+            )
+            process_type = json.loads(json.dumps(type_config))
+            process_type["components"]["droneDynamics"]["mujoco"]["modelPath"] = str(
+                process_model_path
+            )
+            process_type_output.write_text(
+                json.dumps(process_type, indent=2) + "\n", encoding="utf-8"
+            )
+            partition_path = recipe_config / "drone" / "fleets" / f"api-current-part{process_index}.json"
+            partition = json.loads(partition_path.read_text(encoding="utf-8"))
+            partition["types"]["api-mujoco-flat"] = str(process_type_relative)
+            partition_path.write_text(
+                json.dumps(partition, indent=2) + "\n", encoding="utf-8"
+            )
+            process_type_configs.append(str(process_type_output))
+
+    flight_altitude_m = ground_height_m + flight_altitude_agl_m
+    flight_plan = {
+        "altitude_mode": "flat-ground-agl",
+        "altitude_contract": "scenario altitude above configured flat ground",
+        "requested_agl_m": flight_altitude_agl_m,
+        "requested_clearance_m": flight_altitude_agl_m,
+        "altitude_reference_height_m": ground_height_m,
+        "resolved_flight_altitude_m": flight_altitude_m,
+        "spawn_body_clearance_m": spawn_altitude_m,
+        "spawn_minimum_separation_m": spawn_spacing_m,
+        "spawn_points": spawn_points,
+        "formation_targets": [],
+        "formation_rotation_deg_clockwise": formation_rotation_deg,
+        "formation_audience_tilt_deg": formation_tilt_deg,
+    }
+    marker = {
+        "schema_version": 1,
+        "backend": "mujoco-flat",
+        "scope": "non-ICRA drone-fleet-single-host",
+        "drone_root": str(drone_root),
+        "drone_count": drone_count,
+        "process_count": process_count,
+        "flight_plan": flight_plan,
+        "fleet_config": str(fleet),
+        "type_config": str(type_output),
+        "shared_model_receipt": str(model_path.parent / "receipt.json"),
+        "shared_mjb": str(model_path),
+        "process_models": [
+            {
+                "process_index": index,
+                "drone_ids": process_model.get("drone_ids", []),
+                "mjb": str(process_model["compiled_model"]["output_mjb"]),
+                "receipt": str(Path(process_model["compiled_model"]["output_mjb"]).parent / "receipt.json"),
+            }
+            for index, process_model in enumerate(process_models, start=1)
+        ],
+        "process_type_configs": process_type_configs,
+        "environment": environment,
+    }
+    return marker
+
+
+def configure_single_host_flat_fleet(
+    *,
+    drone_root: Path,
+    drone_count: int,
+    recipe_config: Path,
+    origin: dict[str, float],
+    ground_height_m: float,
+    flight_altitude_agl_m: float,
+    spawn_altitude_m: float = LANDING_GEAR_CLEARANCE_M,
+    spawn_spacing_m: float = SPAWN_MIN_SEPARATION_M,
+    process_count: int = 1,
+    formation_rotation_deg: float = 90.0,
+    formation_tilt_deg: float = 15.0,
+) -> dict[str, Any]:
+    model = build_flat_process_models(
+        drone_root=drone_root,
+        drone_count=drone_count,
+        process_count=process_count,
+        output_dir=recipe_config / "drone" / "mujoco-flat-fleet",
+        ground_height_m=ground_height_m,
+        origin=origin,
+    )
+    return materialize_flat_fleet_config(
+        drone_root=drone_root,
+        recipe_config=recipe_config,
+        model_receipt=model,
+        spawn_altitude_m=spawn_altitude_m,
+        spawn_spacing_m=spawn_spacing_m,
+        flight_altitude_agl_m=flight_altitude_agl_m,
         formation_rotation_deg=formation_rotation_deg,
         formation_tilt_deg=formation_tilt_deg,
     )

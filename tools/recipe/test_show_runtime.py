@@ -282,6 +282,52 @@ class ShowRuntimeTest(unittest.TestCase):
                 runtime["show_ir"]["sha256"], show_runtime._sha256(show_ir)
             )
 
+    def test_flat_viewer_has_no_city_environment(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            viewer = root / "hakoniwa-threejs-drone"
+            (viewer / "src").mkdir(parents=True)
+            (viewer / "assets").mkdir()
+            (viewer / "thirdparty").mkdir()
+            (viewer / "config").mkdir()
+            (viewer / "index.html").write_text("viewer", encoding="utf-8")
+            write_json(
+                viewer / "config" / "drone_config-compact-1.json",
+                {"environments": [{"name": "old-city"}]},
+            )
+            write_json(
+                viewer / "config" / "viewer-config-fleets.json",
+                {"three": {}, "stateInput": {"fleets": {}}},
+            )
+            map_viewer = root / "hakoniwa-map-viewer"
+            (map_viewer / "src" / "client").mkdir(parents=True)
+            (map_viewer / "images").mkdir()
+            (map_viewer / "src" / "client" / "frame.js").write_text(
+                "export {};", encoding="utf-8"
+            )
+            marker = root / "flat-marker.json"
+            write_json(marker, {"backend": "mujoco-flat", "drone_count": 180})
+            web_root = show_runtime.materialize_flat_viewer(
+                viewer_root=viewer,
+                web_root=root / "web",
+                marker_path=marker,
+            )
+            embedded = web_root / "thirdparty" / "hakoniwa-threejs-drone"
+            scene = json.loads(
+                (embedded / "config" / "drone_config-flat-fleet.json").read_text()
+            )
+            config = json.loads(
+                (embedded / "config" / "viewer-config-fleets.json").read_text()
+            )
+            self.assertEqual(scene["environments"], [])
+            self.assertEqual(
+                config["three"]["sceneConfigPath"],
+                "./drone_config-flat-fleet.json",
+            )
+            self.assertEqual(
+                config["stateInput"]["fleets"]["maxDynamicDrones"], 180
+            )
+
     def test_configured_city_fleet_is_compiled_into_show_ir(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

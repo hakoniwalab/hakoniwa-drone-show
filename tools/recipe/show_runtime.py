@@ -484,8 +484,13 @@ def materialize_browser(
     if not show_ir_path.is_file():
         raise ShowRuntimeError(f"Show IR does not exist: {show_ir_path}")
     city = marker.get("city_world")
-    if not isinstance(city, dict) or not isinstance(city.get("origin"), dict):
-        raise ShowRuntimeError("MuJoCo City marker has no city origin")
+    environment = marker.get("environment")
+    if isinstance(city, dict) and isinstance(city.get("origin"), dict):
+        origin = city["origin"]
+    elif isinstance(environment, dict) and isinstance(environment.get("origin"), dict):
+        origin = environment["origin"]
+    else:
+        raise ShowRuntimeError("MuJoCo Show marker has no environment origin")
 
     embedded = web_root / "thirdparty" / "hakoniwa-threejs-drone"
     viewer_config_path = embedded / "config" / "viewer-config-fleets.json"
@@ -556,7 +561,7 @@ def materialize_browser(
         "threejs_root": "/thirdparty/hakoniwa-threejs-drone",
         "viewer_config_name": "viewer-config-fleets.json",
         "websocket_url": f"ws://{websocket_host}:8765",
-        "origin": city["origin"],
+        "origin": origin,
         "expected_drone_count": int(marker["drone_count"]),
         "led_appearance": {
             "scale": float(led_appearance["scale"]),
@@ -579,6 +584,64 @@ def materialize_browser(
     }
     _write_json(destination / "runtime-config.json", runtime_config)
     return destination
+
+
+def materialize_flat_viewer(
+    *,
+    viewer_root: Path,
+    web_root: Path,
+    marker_path: Path,
+) -> Path:
+    """Create the Map Viewer-shaped web root without City/PLATEAU assets."""
+
+    viewer_root = viewer_root.resolve()
+    web_root = web_root.resolve()
+    marker = _read_json(marker_path.resolve())
+    if marker.get("backend") != "mujoco-flat":
+        raise ShowRuntimeError("flat Viewer requires a mujoco-flat marker")
+    map_viewer_root = viewer_root.parent / "hakoniwa-map-viewer"
+    map_client = map_viewer_root / "src" / "client"
+    map_images = map_viewer_root / "images"
+    if not map_client.is_dir() or not map_images.is_dir():
+        raise ShowRuntimeError(
+            f"Hakoniwa Map Viewer resources are missing: {map_viewer_root}"
+        )
+    if web_root.exists():
+        shutil.rmtree(web_root)
+    web_root.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(map_client, web_root / "src" / "client", dirs_exist_ok=True)
+    shutil.copytree(map_images, web_root / "images", dirs_exist_ok=True)
+
+    embedded = web_root / "thirdparty" / "hakoniwa-threejs-drone"
+    embedded.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(viewer_root / "index.html", embedded / "index.html")
+    for dirname in ("src", "config", "assets", "thirdparty"):
+        source = viewer_root / dirname
+        if not source.exists():
+            raise ShowRuntimeError(f"Three.js Viewer resource is missing: {source}")
+        shutil.copytree(source, embedded / dirname, dirs_exist_ok=True)
+
+    source_scene = viewer_root / "config" / "drone_config-compact-1.json"
+    scene = _read_json(source_scene)
+    scene["environments"] = []
+    scene_path = embedded / "config" / "drone_config-flat-fleet.json"
+    _write_json(scene_path, scene)
+
+    viewer_config_path = embedded / "config" / "viewer-config-fleets.json"
+    viewer_config = _read_json(viewer_config_path)
+    viewer_config["three"]["sceneConfigPath"] = "./drone_config-flat-fleet.json"
+    fleet_options = viewer_config.setdefault("stateInput", {}).setdefault(
+        "fleets", {}
+    )
+    fleet_options.update(
+        {
+            "dynamicSpawn": True,
+            "templateDroneIndex": 0,
+            "maxDynamicDrones": int(marker["drone_count"]),
+        }
+    )
+    _write_json(viewer_config_path, viewer_config)
+    return web_root
 
 
 def patch_launcher(

@@ -145,6 +145,25 @@ AR-4: 会場位置、仮想観客位置、配置調整
 - [ ] スマホで180機、role別LED、ショー開始操作を確認できる
 - [ ] Mac上の従来URLでも同じViewerを利用できる
 
+## Task AR-0.5: PLATEAUなしの平面Runtime
+
+### 実装
+
+- [x] `environment.mode`で`plateau`と`flat`を切り替えられるようにする
+- [x] `flat`でCity World Receiptを不要にする
+- [x] 指定したローカルZへ平面床を置いた軽量MuJoCo fleet modelを生成する
+- [x] 機体中心を床から既定0.20m上へ配置する
+- [x] `scenario.altitude_m`を床からのAGLとしてShow IRへ反映する
+- [x] 都市GLBを含まないThree.js sceneを生成する
+- [x] City版と同じShow File、Show Runner、PDU、LED、Viewer UIを再利用する
+
+### Acceptance Test
+
+- [ ] `flat`を180機・8プロセスでconfigureできる
+- [ ] 生成MuJoCo modelに都市mesh/colliderが含まれず、平面床だけが存在する
+- [ ] 機体が指定した床面から離陸し、5 Formationとrole別LEDを最後まで再生できる
+- [ ] `plateau`へ戻した場合に従来City World構成を生成できる
+
 ## Task AR-1: 都市付き構成のAR化
 
 ### 実装

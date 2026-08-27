@@ -13,6 +13,15 @@ runtime:
   visualization: true
   show_runner_real_time_sync: true
 
+environment:
+  mode: flat
+  flat:
+    ground_height_m: 5.479387621660862
+    origin:
+      latitude: 35.0988
+      longitude: 138.8587
+      altitude_offset_m: 2.7360082114794118
+
 viewer:
   network:
     host: 192.168.11.47

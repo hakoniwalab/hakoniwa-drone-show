@@ -73,6 +73,7 @@ base.MAP_VIEWER_URL_BASE = (
 )
 _BASE_WRITE_LAUNCHER = base.write_launcher
 _BASE_LOAD_SIMPLE_YAML = base.load_simple_yaml
+_BASE_MUJOCO_RUNTIME_CHECKS = base._mujoco_city_runtime_checks
 _BASE_SCENARIO_COMPATIBILITY = {
     "type": "hakoniwa-word",
     "word": "HAKONIWA",
@@ -89,6 +90,180 @@ _INTERNAL_COMPATIBILITY_FIELDS = (
     | {"speed_m_s", "duration_sec", "hold_sec"}
 )
 _DEFAULT_VIEWER_HOST = "127.0.0.1"
+_CITY_MARKER_NAME = "mujoco-city-fleet.json"
+_FLAT_MARKER_NAME = "mujoco-flat-fleet.json"
+
+
+def _environment_settings(experiment_path: Path) -> dict:
+    raw = _BASE_LOAD_SIMPLE_YAML(experiment_path)
+    value = raw.get("environment", {"mode": "plateau"})
+    if not isinstance(value, dict):
+        raise base.RecipeError("environment must be a mapping")
+    unknown = sorted(set(value) - {"mode", "flat"})
+    if unknown:
+        raise base.RecipeError("environment has unknown fields: " + ", ".join(unknown))
+    mode = value.get("mode", "plateau")
+    if mode not in {"plateau", "flat"}:
+        raise base.RecipeError("environment.mode must be plateau or flat")
+    resolved = {"mode": mode}
+    flat = value.get("flat")
+    if mode == "flat" and not isinstance(flat, dict):
+        raise base.RecipeError("environment.flat is required in flat mode")
+    if flat is None:
+        return resolved
+    if not isinstance(flat, dict):
+        raise base.RecipeError("environment.flat must be a mapping")
+    unknown_flat = sorted(set(flat) - {"ground_height_m", "origin"})
+    if unknown_flat:
+        raise base.RecipeError(
+            "environment.flat has unknown fields: " + ", ".join(unknown_flat)
+        )
+    ground_height = flat.get("ground_height_m")
+    if (
+        not isinstance(ground_height, (int, float))
+        or isinstance(ground_height, bool)
+        or not math.isfinite(float(ground_height))
+    ):
+        raise base.RecipeError("environment.flat.ground_height_m must be finite")
+    origin = flat.get("origin")
+    if not isinstance(origin, dict):
+        raise base.RecipeError("environment.flat.origin must be a mapping")
+    unknown_origin = sorted(
+        set(origin) - {"latitude", "longitude", "altitude_offset_m"}
+    )
+    if unknown_origin:
+        raise base.RecipeError(
+            "environment.flat.origin has unknown fields: "
+            + ", ".join(unknown_origin)
+        )
+    coordinates = {}
+    for key in ("latitude", "longitude", "altitude_offset_m"):
+        item = origin.get(key)
+        if (
+            not isinstance(item, (int, float))
+            or isinstance(item, bool)
+            or not math.isfinite(float(item))
+        ):
+            raise base.RecipeError(f"environment.flat.origin.{key} must be finite")
+        coordinates[key] = float(item)
+    if not -90.0 <= coordinates["latitude"] <= 90.0:
+        raise base.RecipeError("environment.flat.origin.latitude is out of range")
+    if not -180.0 <= coordinates["longitude"] <= 180.0:
+        raise base.RecipeError("environment.flat.origin.longitude is out of range")
+    resolved["flat"] = {
+        "ground_height_m": float(ground_height),
+        "origin": coordinates,
+    }
+    return resolved
+
+
+def _runtime_marker_path(paths) -> Path:
+    flat = paths.recipe_config / _FLAT_MARKER_NAME
+    if flat.is_file():
+        return flat
+    return paths.recipe_config / _CITY_MARKER_NAME
+
+
+def _show_mujoco_runtime_checks(paths, drone_root, experiment, system_name):
+    marker_path = paths.recipe_config / _FLAT_MARKER_NAME
+    if not marker_path.is_file():
+        return _BASE_MUJOCO_RUNTIME_CHECKS(
+            paths, drone_root, experiment, system_name
+        )
+    try:
+        marker = json.loads(marker_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return [("MuJoCo Flat fleet contract", False, str(exc))]
+    checks = []
+    configured_root = Path(str(marker.get("drone_root", ""))).resolve()
+    checks.append(
+        (
+            "MuJoCo Flat Drone PRO workspace",
+            configured_root == drone_root.resolve(),
+            f"configured={configured_root}, selected={drone_root.resolve()}",
+        )
+    )
+    checks.append(
+        (
+            "MuJoCo Flat process-model contract",
+            marker.get("process_count") == experiment.process_count,
+            f"configured={experiment.process_count}, model={marker.get('process_count')}",
+        )
+    )
+    checks.append(
+        (
+            "MuJoCo Flat fleet size",
+            marker.get("drone_count") == experiment.drone_count,
+            f"configured={experiment.drone_count}, model={marker.get('drone_count')}",
+        )
+    )
+    plan = marker.get("flight_plan", {})
+    environment = marker.get("environment", {})
+    try:
+        ground = float(environment["ground_height_m"])
+        resolved = float(plan["resolved_flight_altitude_m"])
+        points = plan["spawn_points"]
+        safety_ok = (
+            environment.get("mode") == "flat"
+            and len(points) == experiment.drone_count
+            and abs(resolved - (ground + experiment.altitude_m)) < 1e-6
+            and all(
+                abs(float(point["body_origin_height_m"]) - (
+                    ground + float(plan["spawn_body_clearance_m"])
+                )) < 1e-6
+                for point in points
+            )
+        )
+        safety_detail = (
+            f"ground={ground:.3f} m, launch_points={len(points)}, "
+            f"flight={resolved:.3f} m"
+        )
+    except (KeyError, TypeError, ValueError) as exc:
+        safety_ok = False
+        safety_detail = f"invalid flat flight_plan: {exc}"
+    checks.append(("MuJoCo Flat ground/altitude contract", safety_ok, safety_detail))
+
+    process_models = marker.get("process_models")
+    observed_ids = []
+    files_ok = isinstance(process_models, list) and len(process_models) == experiment.process_count
+    details = []
+    for process_model in process_models if isinstance(process_models, list) else []:
+        ids = process_model.get("drone_ids", [])
+        mjb = Path(str(process_model.get("mjb", "")))
+        receipt = Path(str(process_model.get("receipt", "")))
+        if isinstance(ids, list):
+            observed_ids.extend(int(value) for value in ids)
+        else:
+            files_ok = False
+            ids = []
+        files_ok = files_ok and mjb.is_file() and receipt.is_file()
+        details.append(
+            f"p{process_model.get('process_index')}={len(ids)} drones, "
+            f"mjb={'OK' if mjb.is_file() else 'NG'}"
+        )
+    coverage_ok = observed_ids == list(range(1, experiment.drone_count + 1))
+    checks.append(
+        (
+            "MuJoCo Flat process models",
+            files_ok and coverage_ok,
+            "; ".join(details),
+        )
+    )
+    type_config = Path(str(marker.get("type_config", "")))
+    checks.append(("MuJoCo Flat Drone type config", type_config.is_file(), str(type_config)))
+    try:
+        checks.append(("Drone PRO service", True, str(base.resolve_drone_binary(drone_root, system_name))))
+    except base.RecipeError as exc:
+        checks.append(("Drone PRO service", False, str(exc)))
+    if experiment.visualization:
+        try:
+            checks.append(("Drone PRO visual-state publisher", True, str(base.resolve_visual_state_publisher(drone_root, system_name))))
+        except base.RecipeError as exc:
+            checks.append(("Drone PRO visual-state publisher", False, str(exc)))
+    return checks
+
+
+base._mujoco_city_runtime_checks = _show_mujoco_runtime_checks
 
 
 def _show_definition(experiment_path: Path) -> tuple[Path, dict]:
@@ -311,7 +486,7 @@ def _map_viewer_url_base(experiment_path: Path) -> str:
         try:
             foundation = base.load_foundation_module()
             paths = foundation.resolve_workspace(base.ROOT, base.RECIPE_ID)
-            marker_path = paths.recipe_config / "mujoco-city-fleet.json"
+            marker_path = _runtime_marker_path(paths)
             marker = json.loads(marker_path.read_text(encoding="utf-8"))
             host = marker["drone_show"]["viewer"]["network"]["host"]
             host = str(ipaddress.IPv4Address(host))
@@ -335,20 +510,26 @@ def _viewer_url(experiment_path: Path, drone_count: int) -> str:
 def _open_viewer(
     experiment_path: Path, *, drone_count_override: int | None = None
 ) -> int:
-    previous = base.MAP_VIEWER_URL_BASE
-    base.MAP_VIEWER_URL_BASE = _map_viewer_url_base(experiment_path)
-    try:
-        return base.open_viewer(
-            experiment_path, drone_count_override=drone_count_override
+    requested = base.resolve_experiment(
+        experiment_path, drone_count_override=drone_count_override
+    )
+    if not requested.visualization:
+        raise base.RecipeError(
+            "runtime.visualization=false; this headless experiment does not start "
+            "VSP, WebBridge, or the Three.js viewer"
         )
-    finally:
-        base.MAP_VIEWER_URL_BASE = previous
+    return (
+        0
+        if base.open_browser(_viewer_url(experiment_path, requested.drone_count))
+        else 1
+    )
 
 
 def _load_base_compatible_experiment(path: Path):
     """Adapt the Show-facing scale to the generic word Recipe contract."""
 
     raw = _BASE_LOAD_SIMPLE_YAML(path)
+    _environment_settings(path)
     viewer = raw.get("viewer")
     if viewer is not None:
         _viewer_settings(path)
@@ -356,6 +537,7 @@ def _load_base_compatible_experiment(path: Path):
     if not isinstance(scenario, dict) or "formation" not in scenario:
         compatible = copy.deepcopy(raw)
         compatible.pop("viewer", None)
+        compatible.pop("environment", None)
         return compatible
     formation_scale_m = _formation_scale_m(path)
     _formation_audience_tilt_deg(path)
@@ -371,6 +553,7 @@ def _load_base_compatible_experiment(path: Path):
         )
     compatible = copy.deepcopy(raw)
     compatible.pop("viewer", None)
+    compatible.pop("environment", None)
     compatible_scenario = compatible["scenario"]
     del compatible_scenario["formation"]
     del compatible_scenario["max_speed_m_s"]
@@ -413,8 +596,17 @@ def _write_show_launcher(
         raise base.RecipeError(
             "the browser-gated Drone Show requires runtime.visualization=true"
         )
+    marker_path = _runtime_marker_path(paths)
+    marker = json.loads(marker_path.read_text(encoding="utf-8"))
+    runtime_viewer_root = viewer_root
+    if marker.get("backend") == "mujoco-flat":
+        runtime_viewer_root = show_runtime.materialize_flat_viewer(
+            viewer_root=viewer_root,
+            web_root=paths.recipe_root / "web" / "map-viewer",
+            marker_path=marker_path,
+        )
     launcher = _BASE_WRITE_LAUNCHER(
-        paths, drone_root, viewer_root, experiment, system_name
+        paths, drone_root, runtime_viewer_root, experiment, system_name
     )
     # ``doctor`` and ``start`` regenerate the Launcher without necessarily
     # running ``configure`` first. Keep the Show-owned SHM slots present for
@@ -429,7 +621,7 @@ def _write_show_launcher(
     show_runtime.materialize_browser(
         show_root=SHOW_ROOT,
         web_root=paths.recipe_root / "web" / "map-viewer",
-        marker_path=paths.recipe_config / "mujoco-city-fleet.json",
+        marker_path=marker_path,
         show_ir_path=paths.recipe_config
         / "scenario"
         / "show-ir"
@@ -513,6 +705,17 @@ def _drone_root(command: str, requested: Path | None) -> Path:
     if requested is not None:
         return requested.expanduser().resolve()
     if command != "configure":
+        try:
+            foundation = base.load_foundation_module()
+            paths = foundation.resolve_workspace(base.ROOT, base.RECIPE_ID)
+            marker = json.loads(
+                _runtime_marker_path(paths).read_text(encoding="utf-8")
+            )
+            configured = marker.get("drone_root")
+            if isinstance(configured, str) and configured:
+                return Path(configured).resolve()
+        except (OSError, ValueError, json.JSONDecodeError):
+            pass
         configured = base.configured_drone_root()
         if configured is not None:
             return configured
@@ -566,10 +769,17 @@ def _require_terminated_launcher_for_configure() -> None:
 
 
 def configure(args: argparse.Namespace, experiment_path: Path, drone_root: Path) -> int:
-    if args.mujoco_city_world is None:
-        raise base.RecipeError("configure requires --mujoco-city-world")
     _require_terminated_launcher_for_configure()
-    city_world = args.mujoco_city_world.expanduser().resolve()
+    environment = _environment_settings(experiment_path)
+    if environment["mode"] == "plateau" and args.mujoco_city_world is None:
+        raise base.RecipeError(
+            "configure requires --mujoco-city-world in plateau mode"
+        )
+    city_world = (
+        args.mujoco_city_world.expanduser().resolve()
+        if args.mujoco_city_world is not None
+        else None
+    )
     formation_scale_m = _formation_scale_m(
         experiment_path, override=args.formation_scale
     )
@@ -593,19 +803,41 @@ def configure(args: argparse.Namespace, experiment_path: Path, drone_root: Path)
     )
     foundation = base.load_foundation_module()
     paths = foundation.resolve_workspace(base.ROOT, base.RECIPE_ID)
-    marker = city.configure_single_host_fleet(
-        drone_root=drone_root,
-        city_world_path=city_world,
-        drone_count=experiment.drone_count,
-        recipe_config=paths.recipe_config,
-        spawn_altitude_m=args.spawn_altitude_m,
-        spawn_spacing_m=args.spawn_spacing_m,
-        altitude_mode=args.altitude_mode,
-        above_city_clearance_m=args.above_city_clearance_m,
-        process_count=experiment.process_count,
-        formation_rotation_deg=args.formation_rotation_deg,
-        formation_tilt_deg=formation_audience_tilt_deg,
-    )
+    city_marker_path = paths.recipe_config / _CITY_MARKER_NAME
+    flat_marker_path = paths.recipe_config / _FLAT_MARKER_NAME
+    flat_marker_path.unlink(missing_ok=True)
+    if environment["mode"] == "plateau":
+        assert city_world is not None
+        marker = city.configure_single_host_fleet(
+            drone_root=drone_root,
+            city_world_path=city_world,
+            drone_count=experiment.drone_count,
+            recipe_config=paths.recipe_config,
+            spawn_altitude_m=args.spawn_altitude_m,
+            spawn_spacing_m=args.spawn_spacing_m,
+            altitude_mode=args.altitude_mode,
+            above_city_clearance_m=args.above_city_clearance_m,
+            process_count=experiment.process_count,
+            formation_rotation_deg=args.formation_rotation_deg,
+            formation_tilt_deg=formation_audience_tilt_deg,
+        )
+        marker_path = city_marker_path
+    else:
+        flat = environment["flat"]
+        marker = city.configure_single_host_flat_fleet(
+            drone_root=drone_root,
+            drone_count=experiment.drone_count,
+            recipe_config=paths.recipe_config,
+            origin=flat["origin"],
+            ground_height_m=flat["ground_height_m"],
+            flight_altitude_agl_m=experiment.altitude_m,
+            spawn_altitude_m=args.spawn_altitude_m,
+            spawn_spacing_m=args.spawn_spacing_m,
+            process_count=experiment.process_count,
+            formation_rotation_deg=args.formation_rotation_deg,
+            formation_tilt_deg=formation_audience_tilt_deg,
+        )
+        marker_path = flat_marker_path
     marker["drone_show"] = {
         "formation_scale_m": formation_scale_m,
         "max_speed_m_s": experiment.speed_m_s,
@@ -615,7 +847,7 @@ def configure(args: argparse.Namespace, experiment_path: Path, drone_root: Path)
             "sha256": hashlib.sha256(show_definition_path.read_bytes()).hexdigest(),
         },
     }
-    (paths.recipe_config / "mujoco-city-fleet.json").write_text(
+    marker_path.write_text(
         json.dumps(marker, indent=2) + "\n", encoding="utf-8"
     )
     show_runtime.extend_asset_pdudef(
@@ -642,7 +874,14 @@ def configure(args: argparse.Namespace, experiment_path: Path, drone_root: Path)
     )
     plan = marker["flight_plan"]
     print("Virtual drone show extension configured")
-    print(f"City World             : {city_world}")
+    print(f"Environment            : {environment['mode']}")
+    if city_world is not None and environment["mode"] == "plateau":
+        print(f"City World             : {city_world}")
+    elif environment["mode"] == "flat":
+        print(
+            "Flat ground            : "
+            f"Z={environment['flat']['ground_height_m']:g} m"
+        )
     print(f"Drone PRO              : {drone_root}")
     print(f"MuJoCo process models  : {len(marker['process_models'])}")
     print(f"Formation scale        : {formation_scale_m:g} m")

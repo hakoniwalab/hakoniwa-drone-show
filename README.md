@@ -37,7 +37,7 @@ CityドローンショーのRecipe、専用experiment、Formation素材および
 City World、Recipe、Launcher、Viewer接続および納品パッケージへの統合は
 [`hakoniwa-business-pack`](https://github.com/hakoniwalab/hakoniwa-business-pack)が担当します。
 
-## Task 0: 現行Cityショーの実行
+## Task 0: ドローンショーRuntimeの実行
 
 Task 0では、Business Packで動作していたCityドローンショーを、機能を追加せず
 本リポジトリの入口から再現します。次のリポジトリを同じ親ディレクトリへ配置します。
@@ -50,22 +50,28 @@ business-pack/
   hakoniwa-threejs-drone/
 ```
 
-City WorldはBusiness PackのCity World Workerで生成済みとし、その
-`city-world-receipt.json`を指定します。
+既定experimentは`environment.mode: flat`で、都市データを使わない平面MuJoCo Worldを
+生成します。
 
 ```bash
 cd hakoniwa-drone-show
 
-python3 tools/recipe/virtual_drone_show.py configure \
-  --mujoco-city-world \
-  ../hakoniwa-business-pack/work/remote-operation/city-world-worker/jobs/<JOB_ID>/build/world/city-world-receipt.json \
-  --altitude-mode route-clearance
-
+python3 tools/recipe/virtual_drone_show.py configure
 python3 tools/recipe/virtual_drone_show.py doctor
 python3 tools/recipe/virtual_drone_show.py start
 python3 tools/recipe/virtual_drone_show.py status
 python3 tools/recipe/virtual_drone_show.py open-viewer
 python3 tools/recipe/virtual_drone_show.py stop
+```
+
+PLATEAU City Worldを使う場合はYAMLを`environment.mode: plateau`へ変更し、Business Packの
+City World Workerが生成した`city-world-receipt.json`を指定します。
+
+```bash
+python3 tools/recipe/virtual_drone_show.py configure \
+  --mujoco-city-world \
+  ../hakoniwa-business-pack/work/remote-operation/city-world-worker/jobs/<JOB_ID>/build/world/city-world-receipt.json \
+  --altitude-mode route-clearance
 ```
 
 `route-clearance`は離陸地点から各Formationまでの計画経路上にある最高コライダーを
@@ -97,7 +103,7 @@ python3 tools/recipe/virtual_drone_show.py stop
 ```
 
 `configure`はBusiness Packの汎用`drone-fleet-single-host` workspaceへ成果物を
-生成します。以後のコマンドは、そのとき保存されたexperiment、Drone PRO、City World
+生成します。以後のコマンドは、そのとき保存されたexperiment、Drone PRO、環境World
 およびViewer設定を再利用するため、通常は同じ引数を繰り返す必要がありません。
 Show用PDU、Bridge経路、Web UIも同workspaceの生成物へ追加されます。Drone Show利用後に
 Business Packの汎用Fleet Recipeへ戻る場合は、汎用Recipe側で`configure`を再実行して

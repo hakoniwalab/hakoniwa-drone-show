@@ -246,6 +246,29 @@ scenario:
                 )
             )
 
+    def test_open_viewer_always_opens_show_ui(self) -> None:
+        experiment = Path("/tmp/flat-show.yaml")
+        resolved = SimpleNamespace(visualization=True, drone_count=180)
+        with (
+            mock.patch.object(
+                recipe.base, "resolve_experiment", return_value=resolved
+            ),
+            mock.patch.object(
+                recipe,
+                "_map_viewer_url_base",
+                return_value=(
+                    "http://127.0.0.1:8000/drone-show/index.html"
+                    "?threejsRoot=/thirdparty/hakoniwa-threejs-drone"
+                    "&viewerConfigName=viewer-config-fleets.json"
+                ),
+            ),
+            mock.patch.object(recipe.base, "open_browser", return_value=True) as opened,
+        ):
+            self.assertEqual(recipe._open_viewer(experiment), 0)
+        url = opened.call_args.args[0]
+        self.assertIn("/drone-show/index.html?", url)
+        self.assertIn("maxDynamicDrones=180", url)
+
     def test_map_viewer_url_uses_generated_marker_network_host(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -296,12 +319,35 @@ scenario:
             ):
                 recipe._formation_audience_tilt_deg(experiment)
 
-    def test_configure_requires_city_world(self) -> None:
-        stderr = io.StringIO()
-        with redirect_stderr(stderr):
-            result = recipe.main(["configure"])
-        self.assertEqual(result, 2)
-        self.assertIn("configure requires --mujoco-city-world", stderr.getvalue())
+    def test_configure_requires_city_world_in_plateau_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            experiment = Path(temporary) / "plateau.yaml"
+            experiment.write_text(
+                "environment:\n  mode: plateau\n", encoding="utf-8"
+            )
+            stderr = io.StringIO()
+            with (
+                mock.patch.object(
+                    recipe, "_require_terminated_launcher_for_configure"
+                ),
+                redirect_stderr(stderr),
+            ):
+                result = recipe.main(
+                    ["configure", "--experiment", str(experiment)]
+                )
+            self.assertEqual(result, 2)
+            self.assertIn(
+                "configure requires --mujoco-city-world in plateau mode",
+                stderr.getvalue(),
+            )
+
+    def test_flat_environment_resolves_ground_and_origin(self) -> None:
+        settings = recipe._environment_settings(recipe.DEFAULT_EXPERIMENT)
+        self.assertEqual(settings["mode"], "flat")
+        self.assertAlmostEqual(
+            settings["flat"]["ground_height_m"], 5.479387621660862
+        )
+        self.assertEqual(settings["flat"]["origin"]["latitude"], 35.0988)
 
     def test_configure_refuses_non_terminated_launcher_session(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -536,6 +582,17 @@ scenario:
             recipe_root=Path("/tmp/recipe-root"),
         )
         with (
+            mock.patch.object(
+                recipe,
+                "_runtime_marker_path",
+                return_value=Path("/tmp/mujoco-city-fleet.json"),
+            ),
+            mock.patch.object(
+                recipe.json,
+                "loads",
+                return_value={"backend": "mujoco-city"},
+            ),
+            mock.patch.object(Path, "read_text", return_value="{}"),
             mock.patch.object(
                 recipe, "_BASE_WRITE_LAUNCHER", return_value=Path("/tmp/launcher.json")
             ),

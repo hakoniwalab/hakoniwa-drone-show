@@ -7,6 +7,7 @@ import tempfile
 import unittest
 import xml.etree.ElementTree as ET
 from pathlib import Path
+from unittest import mock
 
 
 SCRIPT = Path(__file__).with_name("drone_fleet_mujoco_city.py")
@@ -83,6 +84,37 @@ def generate_xml(scene, drone, count):
                 drone_count=0,
                 output_dir=Path("missing"),
             )
+
+    def test_flat_model_sets_ground_height_and_removes_landmarks(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            drone_root = self._fake_drone_root(root)
+
+            def compile_model(source: Path, output: Path, _library: Path) -> dict:
+                output.write_bytes(b"flat-mjb")
+                return {"output_mjb": str(output)}
+
+            with (
+                mock.patch.object(recipe, "find_mujoco_library", return_value=root / "libmujoco"),
+                mock.patch.object(recipe, "compile_mujoco_xml", side_effect=compile_model),
+            ):
+                receipt = recipe.build_flat_shared_model(
+                    drone_root=drone_root,
+                    drone_count=2,
+                    output_dir=root / "flat",
+                    ground_height_m=5.5,
+                    origin={
+                        "latitude": 35.0,
+                        "longitude": 138.0,
+                        "altitude_offset_m": 2.0,
+                    },
+                )
+            model = ET.parse(root / "flat" / "flat-fleet.xml").getroot()
+            ground = model.find("./worldbody/geom[@name='ground']")
+            self.assertEqual(ground.get("pos"), "0 0 5.5")
+            self.assertEqual(ground.get("size"), "1000 1000 .01")
+            self.assertIsNone(model.find("./worldbody/body[@name='landmark_box_1']"))
+            self.assertEqual(receipt["environment"]["mode"], "flat")
 
     def test_safe_spawn_selection_rejects_building_and_keeps_separation(self) -> None:
         def terrain_height(_x: float, _y: float) -> float:

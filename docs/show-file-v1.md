@@ -112,6 +112,9 @@ SVGの細部は粗くなります。
 ```bash
 python3 tools/show_file.py shows/my-show.show.json
 python3 tools/recipe/virtual_drone_show.py stop
+python3 tools/recipe/virtual_drone_show.py configure
+
+# environment.mode: plateauの場合だけ次を使用
 python3 tools/recipe/virtual_drone_show.py configure \
   --mujoco-city-world <city-world-receipt.json> \
   --altitude-mode route-clearance

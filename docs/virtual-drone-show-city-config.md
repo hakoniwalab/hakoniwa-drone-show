@@ -1,7 +1,7 @@
 # Cityドローンショー設定
 
-`recipes/experiments/virtual-drone-show-city.yaml`は、City World上で実行する
-Virtual Drone Showの既定experimentです。この文書は設定項目の正本です。
+`recipes/experiments/virtual-drone-show-city.yaml`は、PLATEAU City Worldまたは
+平面World上で実行するVirtual Drone Showの既定experimentです。この文書は設定項目の正本です。
 
 設定を変更した場合は、生成済みShow IRやLauncherへ自動反映されません。Launcherを
 正規終了してから`configure`を再実行してください。
@@ -10,7 +10,10 @@ Virtual Drone Showの既定experimentです。この文書は設定項目の正�
 python3 tools/recipe/virtual_drone_show.py stop
 python3 tools/recipe/virtual_drone_show.py status
 
-# statusがTERMINATEDであることを確認する
+# statusがTERMINATEDであることを確認する（flat mode）
+python3 tools/recipe/virtual_drone_show.py configure
+
+# plateau modeだけCity World Receiptを指定する
 python3 tools/recipe/virtual_drone_show.py configure \
   --mujoco-city-world \
   ../hakoniwa-business-pack/work/remote-operation/city-world-worker/jobs/<JOB_ID>/build/world/city-world-receipt.json \
@@ -67,6 +70,21 @@ ENU各軸のaxis-aligned bounding boxは、回転によってこの値より小�
 | `runtime.visualization` | 真偽値 | VSP、WebBridge、HTTP ViewerをLauncherへ含めます。ブラウザ開始型のShowでは`true`が必須です。 |
 | `runtime.show_runner_real_time_sync` | 真偽値 | Show Runnerの進行をwall-clock時間へ同期します。観賞用Showでは通常`true`にします。 |
 
+### `environment`
+
+| 項目 | 型・制約 | 説明 |
+|---|---|---|
+| `environment.mode` | `plateau`または`flat` | `plateau`はCity World Receiptの都市mesh・terrain・colliderをMuJoCoとViewerへ組み込みます。`flat`は都市データを一切使わず、Droneと平面床だけの軽量MuJoCo Worldを生成します。 |
+| `environment.flat.ground_height_m` | 有限数 | `flat`の床面を置くローカルZ（m）です。既存City版の離陸地点と高さを合わせる場合は、その地点の`terrain_height_m`を指定します。 |
+| `environment.flat.origin.latitude` | -90〜90 | Leaflet表示とDrone位置基準に使う緯度です。物理床の高さには影響しません。 |
+| `environment.flat.origin.longitude` | -180〜180 | Leaflet表示とDrone位置基準に使う経度です。 |
+| `environment.flat.origin.altitude_offset_m` | 有限数 | Drone simulation locationへ渡す基準標高です。MuJoCoのローカル床Zとは別の値です。 |
+
+`flat`では`--mujoco-city-world`は不要です。床面は`ground_height_m`、機体中心の初期Zは
+`ground_height_m + --spawn-altitude-m`（既定0.20m）、Formationの最低飛行高度は
+`ground_height_m + scenario.altitude_m`として解決されます。既定設定は、直前の静岡City
+Worldにおける中央離陸地点の高さへ合わせています。
+
 ### `viewer`
 
 | 項目 | 型・制約 | 説明 |
@@ -111,7 +129,7 @@ work/recipes/drone-fleet-single-host/viewer-access/viewer-qr.svg
 | `scenario.show_file` | experimentからの相対パス | 機体数非依存のShow Fileです。SVG一覧、実行順、移動・待機時間、LEDを定義します。詳細は[Show File v1](show-file-v1.md)を参照してください。 |
 | `scenario.formation.scale_m` | 0より大きい数値 | 全Formationの公称最大寸法（m）です。顔の大きさを直接調整する項目です。詳細は「Formationの大きさ」を参照してください。 |
 | `scenario.formation.audience_tilt_deg` | -85〜85の数値 | Formation平面を水平面から起こす角度（度）です。0度は上空から見やすい水平、絶対値が90度に近いほど地上の観客へ正対し、符号で傾斜方向が反転します。現在は反対方向を確認できるよう`-60`度に設定しています。`configure --formation-tilt-deg`で一時上書きできます。 |
-| `scenario.altitude_m` | 0.5以上の数値 | City飛行計画が要求する最低クリアランス（m）の既定値です。最終高度はCity colliderと`configure`時の`--altitude-mode`、`--above-city-clearance-m`等から解決され、生成markerとShow IRへ記録されます。 |
+| `scenario.altitude_m` | 0.5以上の数値 | `flat`では床からのFormation最低高度（AGL）です。`plateau`ではCity飛行計画が要求する最低クリアランスで、最終高度はCity colliderと`--altitude-mode`等から解決されます。 |
 | `scenario.max_speed_m_s` | 0より大きい数値 | 機体へ許可する最大移動速度（m/s）です。実際の指令速度は各機体の移動距離をShow Fileの`transition_sec`で割って求めます。configureは必要最大速度がこの値を超える計画をエラーにし、runtimeにも同じ上限を安全策として渡します。値を大きくしても計画時刻より早く到着する設定にはなりません。 |
 | `scenario.timeout_sec` | 1以上の数値 | Fleet命令の完了待ちに使うtimeout（秒）です。遅い移動を設定する場合は必要に応じて増やします。 |
 | `scenario.land` | 真偽値 | `true`ならShow終了後に着陸します。現在のCityデモは`false`で、明示的に`stop`するまで最後のFormationを保持します。 |
@@ -135,12 +153,12 @@ FormationもCityの経路クリアランス計算に使われるため、その�
 
 ## 生成物
 
-`configure`はYAMLを解決し、Fleet分割、City flight plan、Show Plan、Show IR、Launcherを
+`configure`はYAMLを解決し、Fleet分割、flight plan、Show Plan、Show IR、Launcherを
 生成します。次の生成物を直接編集せず、experiment、Show File、SVGの入力を変更して
 再度`configure`してください。
 
 - `resolved-experiment.yaml`
-- `config/mujoco-city-fleet.json`
+- `config/mujoco-city-fleet.json`（`plateau`）または`config/mujoco-flat-fleet.json`（`flat`）
 - `config/scenario/show-ir/show-plan.json`
 - `config/scenario/show-ir/show-ir.json`
 - `runtime/launcher.json`
