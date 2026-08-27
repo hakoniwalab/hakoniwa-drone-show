@@ -114,10 +114,8 @@ python3 tools/show_file.py shows/my-show.show.json
 python3 tools/recipe/virtual_drone_show.py stop
 python3 tools/recipe/virtual_drone_show.py configure
 
-# environment.mode: plateauの場合だけ次を使用
-python3 tools/recipe/virtual_drone_show.py configure \
-  --mujoco-city-world <city-world-receipt.json> \
-  --altitude-mode route-clearance
+# environment.mode: plateauの場合はenvironment.plateauの設定を使用
+python3 tools/recipe/virtual_drone_show.py configure
 ```
 
 JSON Schemaの正本は`schemas/show-file-v1.schema.json`です。

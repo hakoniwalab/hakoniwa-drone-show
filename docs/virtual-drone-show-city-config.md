@@ -13,11 +13,8 @@ python3 tools/recipe/virtual_drone_show.py status
 # statusがTERMINATEDであることを確認する（flat mode）
 python3 tools/recipe/virtual_drone_show.py configure
 
-# plateau modeだけCity World Receiptを指定する
-python3 tools/recipe/virtual_drone_show.py configure \
-  --mujoco-city-world \
-  ../hakoniwa-business-pack/work/remote-operation/city-world-worker/jobs/<JOB_ID>/build/world/city-world-receipt.json \
-  --altitude-mode route-clearance
+# plateau modeではenvironment.plateauの設定を使用する
+python3 tools/recipe/virtual_drone_show.py configure
 ```
 
 ## Formationの大きさ
@@ -80,12 +77,18 @@ ENU各軸のaxis-aligned bounding boxは、回転によってこの値より小�
 | 項目 | 型・制約 | 説明 |
 |---|---|---|
 | `environment.mode` | `plateau`または`flat` | `plateau`はCity World Receiptの都市mesh・terrain・colliderをMuJoCoとViewerへ組み込みます。`flat`は都市データを一切使わず、Droneと平面床だけの軽量MuJoCo Worldを生成します。 |
+| `environment.plateau.city_world_receipt` | experimentからの相対パスまたは絶対パス | `plateau`で使用するBusiness PackのCity World Receiptです。相対パスはexperiment YAMLのディレクトリを基準に解決します。`--mujoco-city-world`はこの値を一時上書きします。 |
+| `environment.plateau.altitude_mode` | `route-clearance`または`city-max-clearance` | 飛行高度の解決方式です。`route-clearance`は計画経路上の最高コライダー、`city-max-clearance`はCity全体の最高コライダーを基準にします。`--altitude-mode`はこの値を一時上書きします。 |
 | `environment.flat.ground_height_m` | 有限数 | `flat`の床面を置くローカルZ（m）です。既存City版の離陸地点と高さを合わせる場合は、その地点の`terrain_height_m`を指定します。 |
 | `environment.flat.origin.latitude` | -90〜90 | Leaflet表示とDrone位置基準に使う緯度です。物理床の高さには影響しません。 |
 | `environment.flat.origin.longitude` | -180〜180 | Leaflet表示とDrone位置基準に使う経度です。 |
 | `environment.flat.origin.altitude_offset_m` | 有限数 | Drone simulation locationへ渡す基準標高です。MuJoCoのローカル床Zとは別の値です。 |
 
-`flat`では`--mujoco-city-world`は不要です。床面は`ground_height_m`、機体中心の初期Zは
+`plateau`では`city_world_receipt`が必須です。既定experimentには静岡City Worldへの相対パスと
+`altitude_mode: route-clearance`を設定しているため、通常は`mode`を変更するだけで有効になります。
+別Cityや別の高度解決方式を一時的に試す場合だけCLIオプションを指定します。
+
+`flat`ではCity World Receiptを参照しません。床面は`ground_height_m`、機体中心の初期Zは
 `ground_height_m + --spawn-altitude-m`（既定0.20m）、Formationの最低飛行高度は
 `ground_height_m + scenario.altitude_m`として解決されます。既定設定は、直前の静岡City
 Worldにおける中央離陸地点の高さへ合わせています。

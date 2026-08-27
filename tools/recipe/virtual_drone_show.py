@@ -185,13 +185,43 @@ def _environment_settings(experiment_path: Path) -> dict:
     value = raw.get("environment", {"mode": "plateau"})
     if not isinstance(value, dict):
         raise base.RecipeError("environment must be a mapping")
-    unknown = sorted(set(value) - {"mode", "flat"})
+    unknown = sorted(set(value) - {"mode", "plateau", "flat"})
     if unknown:
         raise base.RecipeError("environment has unknown fields: " + ", ".join(unknown))
     mode = value.get("mode", "plateau")
     if mode not in {"plateau", "flat"}:
         raise base.RecipeError("environment.mode must be plateau or flat")
     resolved = {"mode": mode}
+    plateau = value.get("plateau")
+    if plateau is not None:
+        if not isinstance(plateau, dict):
+            raise base.RecipeError("environment.plateau must be a mapping")
+        unknown_plateau = sorted(
+            set(plateau) - {"city_world_receipt", "altitude_mode"}
+        )
+        if unknown_plateau:
+            raise base.RecipeError(
+                "environment.plateau has unknown fields: "
+                + ", ".join(unknown_plateau)
+            )
+        city_world_receipt = plateau.get("city_world_receipt")
+        if (
+            not isinstance(city_world_receipt, str)
+            or not city_world_receipt.strip()
+        ):
+            raise base.RecipeError(
+                "environment.plateau.city_world_receipt must be a non-empty path"
+            )
+        altitude_mode = plateau.get("altitude_mode", "route-clearance")
+        if altitude_mode not in {"route-clearance", "city-max-clearance"}:
+            raise base.RecipeError(
+                "environment.plateau.altitude_mode must be route-clearance "
+                "or city-max-clearance"
+            )
+        resolved["plateau"] = {
+            "city_world_receipt": city_world_receipt.strip(),
+            "altitude_mode": altitude_mode,
+        }
     flat = value.get("flat")
     if mode == "flat" and not isinstance(flat, dict):
         raise base.RecipeError("environment.flat is required in flat mode")
@@ -241,6 +271,30 @@ def _environment_settings(experiment_path: Path) -> dict:
         "origin": coordinates,
     }
     return resolved
+
+
+def _city_world_path(
+    experiment_path: Path,
+    environment: dict,
+    override: Path | None,
+) -> Path | None:
+    if override is not None:
+        return override.expanduser().resolve()
+    configured = environment.get("plateau", {}).get("city_world_receipt")
+    if configured is None:
+        return None
+    requested = Path(configured).expanduser()
+    if not requested.is_absolute():
+        requested = experiment_path.parent / requested
+    return requested.resolve()
+
+
+def _altitude_mode(environment: dict, override: str | None) -> str:
+    if override is not None:
+        return override
+    return environment.get("plateau", {}).get(
+        "altitude_mode", "route-clearance"
+    )
 
 
 def _runtime_marker_path(paths) -> Path:
@@ -976,7 +1030,11 @@ def parser() -> argparse.ArgumentParser:
     result.add_argument("--experiment", type=Path)
     result.add_argument("--drone-root", type=Path)
     result.add_argument("--viewer-root", type=Path)
-    result.add_argument("--mujoco-city-world", type=Path)
+    result.add_argument(
+        "--mujoco-city-world",
+        type=Path,
+        help="override environment.plateau.city_world_receipt",
+    )
     result.add_argument("--timeout-sec", type=float, default=300.0)
     result.add_argument("--drone-count", type=int)
     result.add_argument("--process-count", type=int)
@@ -997,7 +1055,8 @@ def parser() -> argparse.ArgumentParser:
     result.add_argument(
         "--altitude-mode",
         choices=["route-clearance", "city-max-clearance"],
-        default="route-clearance",
+        default=None,
+        help="override environment.plateau.altitude_mode",
     )
     result.add_argument("--above-city-clearance-m", type=float, default=10.0)
     return result
@@ -1082,15 +1141,17 @@ def _require_terminated_launcher_for_configure() -> None:
 def configure(args: argparse.Namespace, experiment_path: Path, drone_root: Path) -> int:
     _require_terminated_launcher_for_configure()
     environment = _environment_settings(experiment_path)
-    if environment["mode"] == "plateau" and args.mujoco_city_world is None:
-        raise base.RecipeError(
-            "configure requires --mujoco-city-world in plateau mode"
-        )
-    city_world = (
-        args.mujoco_city_world.expanduser().resolve()
-        if args.mujoco_city_world is not None
-        else None
+    city_world = _city_world_path(
+        experiment_path, environment, args.mujoco_city_world
     )
+    altitude_mode = _altitude_mode(environment, args.altitude_mode)
+    if environment["mode"] == "plateau" and city_world is None:
+        raise base.RecipeError(
+            "plateau mode requires environment.plateau.city_world_receipt "
+            "or --mujoco-city-world"
+        )
+    if environment["mode"] == "plateau" and not city_world.is_file():
+        raise base.RecipeError(f"City World Receipt does not exist: {city_world}")
     formation_scale_m = _formation_scale_m(
         experiment_path, override=args.formation_scale
     )
@@ -1130,7 +1191,7 @@ def configure(args: argparse.Namespace, experiment_path: Path, drone_root: Path)
             recipe_config=paths.recipe_config,
             spawn_altitude_m=args.spawn_altitude_m,
             spawn_spacing_m=args.spawn_spacing_m,
-            altitude_mode=args.altitude_mode,
+            altitude_mode=altitude_mode,
             above_city_clearance_m=args.above_city_clearance_m,
             process_count=experiment.process_count,
             formation_rotation_deg=args.formation_rotation_deg,
@@ -1214,6 +1275,7 @@ def configure(args: argparse.Namespace, experiment_path: Path, drone_root: Path)
     print(f"Environment            : {environment['mode']}")
     if city_world is not None and environment["mode"] == "plateau":
         print(f"City World             : {city_world}")
+        print(f"Altitude mode          : {altitude_mode}")
     elif environment["mode"] == "flat":
         print(
             "Flat ground            : "

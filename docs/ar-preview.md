@@ -1,5 +1,9 @@
 # カメラARプレビュー
 
+この文書はARプレビューの利用手順です。既存のPLATEAU City版を起点として、スマートフォン
+公開、カメラ重畳、PLATEAUなしの平面Runtimeへ段階的に対応する開発手順は
+[PLATEAU City版からAR版への対応手順](ar-porting-procedure.md)を参照してください。
+
 ## 方式
 
 カメラARはWebXRではなく、背面カメラ映像の上へ透明なThree.js Viewerを重ねます。
@@ -99,3 +103,45 @@ AR URLは`https://<Mac LAN IP>:8443/drone-show/ar/index.html`、PDU接続は同�
 
 福井など会場外から静岡会場の見え方を試す場合は、画面操作ではなくYAMLを
 `location_source: override`へ変更して`configure`し直します。
+
+## PLATEAU RuntimeでARを使う
+
+ARページは常に都市GLBを描画せず、背面カメラ映像を背景にします。一方、MuJoCo側では
+PLATEAU City Worldのterrain、colliderおよび離陸高度を使用できます。
+
+まず`recipes/experiments/virtual-drone-show-city.yaml`を変更します。
+
+```yaml
+environment:
+  mode: plateau
+  plateau:
+    city_world_receipt: ../../../hakoniwa-business-pack/work/remote-operation/city-world-worker/jobs/shizuoka-22203-lat35.099-lon138.859/build/world/city-world-receipt.json
+    altitude_mode: route-clearance
+```
+
+Launcherを正常終了し、再configureします。Receiptの相対パスはexperiment YAMLの場所を
+基準に解決されます。
+
+```bash
+python3 tools/recipe/virtual_drone_show.py stop
+python3 tools/recipe/virtual_drone_show.py status
+
+python3 tools/recipe/virtual_drone_show.py configure
+
+python3 tools/recipe/virtual_drone_show.py doctor
+python3 tools/recipe/virtual_drone_show.py start
+python3 tools/recipe/virtual_drone_show.py open-ar
+```
+
+`status`が`TERMINATED`でない状態では`configure`できません。通常の観客向けデモには、
+離陸地点からFormationまでの計画経路を基準にする`route-clearance`を推奨します。City全体の
+最高コライダーより上へ飛ばす場合はYAMLを`city-max-clearance`へ変更します。
+
+別のCity Worldや高度解決方式を一時的に使う場合だけ、CLIでYAMLの設定を上書きします。
+
+```bash
+python3 tools/recipe/virtual_drone_show.py configure \
+  --mujoco-city-world \
+  ../hakoniwa-business-pack/work/remote-operation/city-world-worker/jobs/<JOB_ID>/build/world/city-world-receipt.json \
+  --altitude-mode route-clearance
+```

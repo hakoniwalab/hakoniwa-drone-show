@@ -411,13 +411,80 @@ scenario:
                 )
             self.assertEqual(result, 2)
             self.assertIn(
-                "configure requires --mujoco-city-world in plateau mode",
+                "plateau mode requires environment.plateau.city_world_receipt",
                 stderr.getvalue(),
             )
+
+    def test_plateau_city_world_receipt_resolves_from_experiment(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            experiment = root / "config" / "experiment.yaml"
+            experiment.parent.mkdir()
+            receipt = root / "city" / "city-world-receipt.json"
+            receipt.parent.mkdir()
+            receipt.write_text("{}\n", encoding="utf-8")
+            experiment.write_text(
+                """environment:
+  mode: plateau
+  plateau:
+    city_world_receipt: ../city/city-world-receipt.json
+    altitude_mode: city-max-clearance
+""",
+                encoding="utf-8",
+            )
+            environment = recipe._environment_settings(experiment)
+            self.assertEqual(
+                recipe._city_world_path(experiment, environment, None),
+                receipt.resolve(),
+            )
+            self.assertEqual(
+                recipe._altitude_mode(environment, None),
+                "city-max-clearance",
+            )
+
+    def test_city_world_cli_override_takes_precedence(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            experiment = root / "experiment.yaml"
+            experiment.write_text(
+                """environment:
+  mode: plateau
+  plateau:
+    city_world_receipt: configured.json
+""",
+                encoding="utf-8",
+            )
+            override = root / "override.json"
+            environment = recipe._environment_settings(experiment)
+            self.assertEqual(
+                recipe._city_world_path(experiment, environment, override),
+                override.resolve(),
+            )
+
+    def test_altitude_mode_cli_override_takes_precedence(self) -> None:
+        environment = {
+            "mode": "plateau",
+            "plateau": {
+                "city_world_receipt": "configured.json",
+                "altitude_mode": "route-clearance",
+            },
+        }
+        self.assertEqual(
+            recipe._altitude_mode(environment, "city-max-clearance"),
+            "city-max-clearance",
+        )
 
     def test_flat_environment_resolves_ground_and_origin(self) -> None:
         settings = recipe._environment_settings(recipe.DEFAULT_EXPERIMENT)
         self.assertEqual(settings["mode"], "flat")
+        self.assertTrue(
+            settings["plateau"]["city_world_receipt"].endswith(
+                "city-world-receipt.json"
+            )
+        )
+        self.assertEqual(
+            settings["plateau"]["altitude_mode"], "route-clearance"
+        )
         self.assertAlmostEqual(
             settings["flat"]["ground_height_m"], 5.479387621660862
         )

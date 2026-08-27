@@ -95,19 +95,20 @@ python3 tools/recipe/virtual_drone_show.py open-ar
 通常ViewerのHTTP `:8000`とWebSocket `:8765`は変更しません。AR専用Gatewayは
 HTTPS `:8443`の同一オリジン上でARページと`/pdu`のWSSを提供します。互換・診断用の
 WSS `:8766`も維持します。詳細は[ARプレビュー手順](docs/ar-preview.md)を
-参照してください。
+参照してください。PLATEAU City版からAR版へ段階的に対応した設計・検証の順序は
+[PLATEAU City版からAR版への対応手順](docs/ar-porting-procedure.md)に残しています。
 
-PLATEAU City Worldを使う場合はYAMLを`environment.mode: plateau`へ変更し、Business Packの
-City World Workerが生成した`city-world-receipt.json`を指定します。
+PLATEAU City Worldを使う場合はYAMLを`environment.mode: plateau`へ変更します。使用する
+Receiptと高度解決方式は`environment.plateau`へ固定できるため、通常はCLI指定不要です。
 
 ```bash
-python3 tools/recipe/virtual_drone_show.py configure \
-  --mujoco-city-world \
-  ../hakoniwa-business-pack/work/remote-operation/city-world-worker/jobs/<JOB_ID>/build/world/city-world-receipt.json \
-  --altitude-mode route-clearance
+python3 tools/recipe/virtual_drone_show.py configure
 ```
 
-`route-clearance`は離陸地点から各Formationまでの計画経路上にある最高コライダーを
+別のCity Worldまたは高度解決方式を一時的に使う場合だけ、`--mujoco-city-world`または
+`--altitude-mode`でYAMLを上書きします。
+
+既定の`route-clearance`は離陸地点から各Formationまでの計画経路上にある最高コライダーを
 基準に飛行高度を決めます。ショーを近く見せる通常のデモではこちらを使用します。
 生成City全体で最も高い建物より上を常に飛ばしたい場合だけ、より保守的な
 `--altitude-mode city-max-clearance`を指定します。

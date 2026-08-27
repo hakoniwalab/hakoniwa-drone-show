@@ -117,6 +117,9 @@ ar:
 完成形を一度に作らず、現在動作しているCity版から一要素ずつ変更する。各段階で前段と
 同じDrone位置、LED、開始操作になることを確認してから次へ進む。
 
+実際に採用したPLATEAU City版からの変更順序、各段階の確認項目、切り戻し方法は
+[`docs/ar-porting-procedure.md`](docs/ar-porting-procedure.md)に記録する。
+
 ```text
 AR-0: 現行City Viewerをスマホから表示
   ↓

@@ -14,7 +14,10 @@ runtime:
   show_runner_real_time_sync: true
 
 environment:
-  mode: flat
+  mode: plateau
+  plateau:
+    city_world_receipt: ../../../hakoniwa-business-pack/work/remote-operation/city-world-worker/jobs/shizuoka-22203-lat35.099-lon138.859/build/world/city-world-receipt.json
+    altitude_mode: route-clearance
   flat:
     ground_height_m: 5.479387621660862
     origin:
