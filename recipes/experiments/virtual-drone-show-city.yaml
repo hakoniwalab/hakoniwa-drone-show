@@ -14,6 +14,8 @@ runtime:
   show_runner_real_time_sync: true
 
 viewer:
+  network:
+    host: 192.168.11.47
   initial_mode: audience
   led_appearance:
     scale: 1.45

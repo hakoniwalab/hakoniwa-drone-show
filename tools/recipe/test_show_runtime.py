@@ -213,6 +213,7 @@ class ShowRuntimeTest(unittest.TestCase):
                     "drone_count": 2,
                     "drone_show": {
                         "viewer": {
+                            "network": {"host": "192.168.1.23"},
                             "initial_mode": "audience",
                             "audience_camera": {
                                 "position_m": [0.0, -40.0, 3.0],
@@ -272,6 +273,9 @@ class ShowRuntimeTest(unittest.TestCase):
             self.assertEqual(
                 runtime["camera"],
                 {"initial_mode": "audience", "audience_available": True},
+            )
+            self.assertEqual(
+                runtime["websocket_url"], "ws://192.168.1.23:8765"
             )
             self.assertEqual(runtime["show_ir"]["url"], "./show-ir.json")
             self.assertEqual(

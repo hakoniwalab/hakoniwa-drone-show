@@ -71,6 +71,7 @@ ENU各軸のaxis-aligned bounding boxは、回転によってこの値より小�
 
 | 項目 | 型・制約 | 説明 |
 |---|---|---|
+| `viewer.network.host` | IPv4アドレス | Viewerを開く端末から到達可能なホストのIPv4アドレスです。`open-viewer`の表示URLとブラウザのWebSocket接続先へ使います。Macだけで見る場合は`127.0.0.1`、同じLANのスマホから見る場合はMacのLAN IPを指定します。HTTPサーバーとWebBridge自体は全インタフェースで待ち受けます。 |
 | `viewer.initial_mode` | `free`または`audience` | ブラウザ起動時の視点です。`free`は従来のOrbitカメラ、`audience`は下記の観客視点です。ブラウザ上でいつでも切り替えられます。 |
 | `viewer.led_appearance.scale` | 0より大きく4以下 | LEDスプライト全体の表示サイズ倍率です。機体間隔やFormation寸法は変わりません。既定値は`1.45`です。 |
 | `viewer.led_appearance.intensity` | 0より大きく4以下 | Show Planで解決された機体別brightnessへ掛ける、画面表示全体の発光強度倍率です。既定値は`1.25`です。 |
@@ -88,6 +89,20 @@ ENU各軸のaxis-aligned bounding boxは、回転によってこの値より小�
 
 `viewer.led_appearance`はThree.js上の見え方だけを調整します。Show PlanのLED
 `brightness`（0〜1）は機体・フレーム別の演出値であり、こちらの設定では変更しません。
+
+スマホ表示ではMacとスマホを同じLANへ接続し、`viewer.network.host`へMacのLAN IPを
+設定して`configure`を再実行します。`open-viewer`が表示するURLをスマホで開いてください。
+IPアドレスが変わった場合もYAMLを更新して再度`configure`します。このHTTP接続は現行
+ViewerのLAN疎通確認用です。カメラとWebXRを使うAR版では、後続TaskでHTTPS/WSSを追加します。
+
+`configure`は同じURLを格納した次のファイルも生成します。Macで`viewer-qr.svg`を開き、
+スマホのカメラで読み取ると長いURLを入力せずにViewerを開けます。QR生成は同梱の純Python
+encoderを使用するため、pip packageや外部Webサービスを必要としません。
+
+```text
+work/recipes/drone-fleet-single-host/viewer-access/viewer-url.txt
+work/recipes/drone-fleet-single-host/viewer-access/viewer-qr.svg
+```
 
 ### `scenario`
 

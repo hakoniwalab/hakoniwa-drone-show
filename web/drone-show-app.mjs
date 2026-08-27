@@ -1,6 +1,7 @@
 import { ShowControlClient } from './show-control-client.mjs';
 import { audienceCameraYaml, displayAudienceCameraState } from './audience-camera-config.mjs';
 import { ledStatesForFrame, rgbCss, validateShowIrForViewer } from './show-led-timeline.mjs';
+import { bytesToHex, sha256Bytes } from './sha256.mjs';
 
 const ui = {
   state: document.getElementById('show-state'),
@@ -137,10 +138,6 @@ function resolveByBase(baseUrl, value) {
   return new URL(value, new URL(baseUrl, window.location.href)).toString();
 }
 
-function bytesToHex(bytes) {
-  return [...bytes].map((value) => value.toString(16).padStart(2, '0')).join('');
-}
-
 async function loadShowIr(runtime) {
   const showConfig = runtime.show_ir;
   if (!showConfig?.url || !/^[0-9a-f]{64}$/.test(showConfig.sha256 ?? '')) {
@@ -149,8 +146,7 @@ async function loadShowIr(runtime) {
   const response = await fetch(showConfig.url, { cache: 'no-store' });
   if (!response.ok) throw new Error(`Show IR load failed: ${response.status}`);
   const encoded = await response.arrayBuffer();
-  const digest = await window.crypto.subtle.digest('SHA-256', encoded);
-  const actualSha256 = bytesToHex(new Uint8Array(digest));
+  const actualSha256 = bytesToHex(await sha256Bytes(encoded));
   if (actualSha256 !== showConfig.sha256) {
     throw new Error('Show IR hash does not match runtime configuration');
   }

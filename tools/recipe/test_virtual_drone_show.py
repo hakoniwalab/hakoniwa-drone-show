@@ -163,6 +163,7 @@ scenario:
         )
         viewer = recipe._viewer_settings(recipe.DEFAULT_EXPERIMENT)
         self.assertEqual(viewer["initial_mode"], "audience")
+        self.assertEqual(viewer["network"]["host"], "192.168.11.47")
         self.assertEqual(len(viewer["audience_camera"]["position_m"]), 3)
         self.assertGreater(viewer["led_appearance"]["scale"], 0.0)
         self.assertLessEqual(viewer["led_appearance"]["scale"], 4.0)
@@ -207,6 +208,71 @@ scenario:
                 recipe.base.RecipeError, r"scale must be within \(0, 4\]"
             ):
                 recipe._viewer_settings(experiment)
+
+    def test_viewer_network_rejects_non_ipv4_host(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            experiment = Path(temporary) / "experiment.yaml"
+            experiment.write_text(
+                """viewer:
+  network:
+    host: http://192.168.1.10
+""",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(
+                recipe.base.RecipeError, "host must be an IPv4 address"
+            ):
+                recipe._viewer_settings(experiment)
+
+    def test_map_viewer_url_uses_configured_network_host(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            experiment = Path(temporary) / "experiment.yaml"
+            experiment.write_text(
+                """viewer:
+  network:
+    host: 192.168.1.23
+""",
+                encoding="utf-8",
+            )
+            self.assertTrue(
+                recipe._map_viewer_url_base(experiment).startswith(
+                    "http://192.168.1.23:8000/drone-show/index.html?"
+                )
+            )
+
+    def test_map_viewer_url_uses_generated_marker_network_host(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            experiment = root / "resolved-experiment.yaml"
+            experiment.write_text("version: 1\n", encoding="utf-8")
+            recipe_config = root / "config"
+            recipe_config.mkdir()
+            (recipe_config / "mujoco-city-fleet.json").write_text(
+                json.dumps(
+                    {
+                        "drone_show": {
+                            "viewer": {
+                                "network": {"host": "192.168.1.42"}
+                            }
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            foundation = SimpleNamespace(
+                resolve_workspace=mock.Mock(
+                    return_value=SimpleNamespace(recipe_config=recipe_config)
+                )
+            )
+            with mock.patch.object(
+                recipe.base, "load_foundation_module", return_value=foundation
+            ):
+                url = recipe._map_viewer_url_base(experiment)
+            self.assertTrue(
+                url.startswith(
+                    "http://192.168.1.42:8000/drone-show/index.html?"
+                )
+            )
 
     def test_formation_audience_tilt_rejects_out_of_range_value(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -293,6 +359,14 @@ scenario:
     def test_configure_materializes_city_extension_after_base_recipe(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
+            experiment_path = root / "experiment.yaml"
+            experiment_path.write_text(
+                """viewer:
+  network:
+    host: 192.168.1.23
+""",
+                encoding="utf-8",
+            )
             city_world = root / "city-world-receipt.json"
             city_world.write_text("{}\n", encoding="utf-8")
             recipe_config = root / "config"
@@ -340,7 +414,10 @@ scenario:
                 mock.patch.object(
                     recipe,
                     "_viewer_settings",
-                    return_value={"initial_mode": "free"},
+                    return_value={
+                        "initial_mode": "free",
+                        "network": {"host": "192.168.1.23"},
+                    },
                 ),
                 mock.patch.object(
                     recipe,
@@ -386,7 +463,7 @@ scenario:
                 redirect_stdout(io.StringIO()),
             ):
                 result = recipe.configure(
-                    args, root / "experiment.yaml", root / "drone-pro"
+                    args, experiment_path, root / "drone-pro"
                 )
 
             self.assertEqual(result, 0)
@@ -406,7 +483,10 @@ scenario:
                 {
                     "formation_scale_m": 15.0,
                     "max_speed_m_s": 20.0,
-                    "viewer": {"initial_mode": "free"},
+                    "viewer": {
+                        "initial_mode": "free",
+                        "network": {"host": "192.168.1.23"},
+                    },
                     "show_definition": {
                         "path": str(
                             recipe.SHOW_ROOT / "shows" / "three-face.show.json"
@@ -420,6 +500,12 @@ scenario:
                         ).hexdigest(),
                     },
                 },
+            )
+            viewer_access = root / "viewer-access"
+            self.assertTrue((viewer_access / "viewer-qr.svg").is_file())
+            self.assertIn(
+                "http://192.168.1.23:8000/drone-show/index.html",
+                (viewer_access / "viewer-url.txt").read_text(encoding="utf-8"),
             )
             extend_pdudef.assert_called_once_with(
                 recipe_config / "pdudef" / "drone-pdudef-current.json"

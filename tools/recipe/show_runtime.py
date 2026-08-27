@@ -518,6 +518,8 @@ def materialize_browser(
     initial_mode = viewer_settings.get("initial_mode", "free")
     viewer_config["three"]["initialCameraMode"] = initial_mode
     audience = viewer_settings.get("audience_camera")
+    network = viewer_settings.get("network", {"host": "127.0.0.1"})
+    websocket_host = network.get("host", "127.0.0.1")
     led_appearance = viewer_settings.get(
         "led_appearance", {"scale": 1.45, "intensity": 1.25}
     )
@@ -553,7 +555,7 @@ def materialize_browser(
         "schema_version": 1,
         "threejs_root": "/thirdparty/hakoniwa-threejs-drone",
         "viewer_config_name": "viewer-config-fleets.json",
-        "websocket_url": "ws://127.0.0.1:8765",
+        "websocket_url": f"ws://{websocket_host}:8765",
         "origin": city["origin"],
         "expected_drone_count": int(marker["drone_count"]),
         "led_appearance": {

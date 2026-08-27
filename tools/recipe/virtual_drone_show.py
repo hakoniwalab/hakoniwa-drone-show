@@ -12,6 +12,7 @@ import argparse
 import copy
 import hashlib
 import importlib.util
+import ipaddress
 import json
 import math
 import os
@@ -62,6 +63,7 @@ city = _load_module(
 )
 from tools.recipe import show_runtime
 from tools.show_file import ShowFileError, load_show_file
+from tools.viewer_qr import write_viewer_qr
 
 base.OPERATOR_COMMAND = "python ../hakoniwa-drone-show/tools/recipe/virtual_drone_show.py"
 base.MAP_VIEWER_URL_BASE = (
@@ -86,6 +88,7 @@ _INTERNAL_COMPATIBILITY_FIELDS = (
     | set(_LEGACY_BASE_WORD_DIMENSIONS)
     | {"speed_m_s", "duration_sec", "hold_sec"}
 )
+_DEFAULT_VIEWER_HOST = "127.0.0.1"
 
 
 def _show_definition(experiment_path: Path) -> tuple[Path, dict]:
@@ -179,18 +182,42 @@ def _viewer_settings(experiment_path: Path) -> dict:
     raw = _BASE_LOAD_SIMPLE_YAML(experiment_path)
     viewer = raw.get("viewer")
     if viewer is None:
-        return {"initial_mode": "free"}
+        return {
+            "initial_mode": "free",
+            "network": {"host": _DEFAULT_VIEWER_HOST},
+        }
     if not isinstance(viewer, dict):
         raise base.RecipeError("viewer must be a mapping")
     unknown = sorted(
-        set(viewer) - {"initial_mode", "audience_camera", "led_appearance"}
+        set(viewer)
+        - {"initial_mode", "audience_camera", "led_appearance", "network"}
     )
     if unknown:
         raise base.RecipeError("viewer has unknown fields: " + ", ".join(unknown))
     initial_mode = viewer.get("initial_mode", "free")
     if initial_mode not in {"free", "audience"}:
         raise base.RecipeError("viewer.initial_mode must be free or audience")
-    settings = {"initial_mode": initial_mode}
+    network = viewer.get("network", {})
+    if not isinstance(network, dict):
+        raise base.RecipeError("viewer.network must be a mapping")
+    unknown_network = sorted(set(network) - {"host"})
+    if unknown_network:
+        raise base.RecipeError(
+            "viewer.network has unknown fields: " + ", ".join(unknown_network)
+        )
+    host = network.get("host", _DEFAULT_VIEWER_HOST)
+    if not isinstance(host, str):
+        raise base.RecipeError("viewer.network.host must be an IPv4 address")
+    try:
+        resolved_host = str(ipaddress.IPv4Address(host))
+    except ipaddress.AddressValueError as exc:
+        raise base.RecipeError(
+            "viewer.network.host must be an IPv4 address"
+        ) from exc
+    settings = {
+        "initial_mode": initial_mode,
+        "network": {"host": resolved_host},
+    }
     led_appearance = viewer.get("led_appearance")
     if led_appearance is not None:
         if not isinstance(led_appearance, dict):
@@ -269,6 +296,53 @@ def _viewer_settings(experiment_path: Path) -> dict:
         **resolved,
     }
     return settings
+
+
+def _map_viewer_url_base(experiment_path: Path) -> str:
+    raw = _BASE_LOAD_SIMPLE_YAML(experiment_path)
+    viewer = raw.get("viewer")
+    has_explicit_network = (
+        isinstance(viewer, dict) and "network" in viewer
+    )
+    if has_explicit_network:
+        host = _viewer_settings(experiment_path)["network"]["host"]
+    else:
+        host = _DEFAULT_VIEWER_HOST
+        try:
+            foundation = base.load_foundation_module()
+            paths = foundation.resolve_workspace(base.ROOT, base.RECIPE_ID)
+            marker_path = paths.recipe_config / "mujoco-city-fleet.json"
+            marker = json.loads(marker_path.read_text(encoding="utf-8"))
+            host = marker["drone_show"]["viewer"]["network"]["host"]
+            host = str(ipaddress.IPv4Address(host))
+        except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError):
+            pass
+    return (
+        f"http://{host}:8000/drone-show/index.html"
+        "?threejsRoot=/thirdparty/hakoniwa-threejs-drone"
+        "&viewerConfigName=viewer-config-fleets.json"
+    )
+
+
+def _viewer_url(experiment_path: Path, drone_count: int) -> str:
+    return (
+        f"{_map_viewer_url_base(experiment_path)}"
+        f"&dynamicSpawn=true&templateDroneIndex=0"
+        f"&maxDynamicDrones={drone_count}"
+    )
+
+
+def _open_viewer(
+    experiment_path: Path, *, drone_count_override: int | None = None
+) -> int:
+    previous = base.MAP_VIEWER_URL_BASE
+    base.MAP_VIEWER_URL_BASE = _map_viewer_url_base(experiment_path)
+    try:
+        return base.open_viewer(
+            experiment_path, drone_count_override=drone_count_override
+        )
+    finally:
+        base.MAP_VIEWER_URL_BASE = previous
 
 
 def _load_base_compatible_experiment(path: Path):
@@ -558,6 +632,14 @@ def configure(args: argparse.Namespace, experiment_path: Path, drone_root: Path)
     )
     launcher = paths.recipe_config / "launcher.json"
     launcher.unlink(missing_ok=True)
+    viewer_url = _viewer_url(experiment_path, experiment.drone_count)
+    viewer_access = paths.recipe_root / "viewer-access"
+    viewer_access.mkdir(parents=True, exist_ok=True)
+    viewer_url_path = viewer_access / "viewer-url.txt"
+    viewer_url_path.write_text(viewer_url + "\n", encoding="utf-8")
+    viewer_qr_path = write_viewer_qr(
+        viewer_access / "viewer-qr.svg", viewer_url
+    )
     plan = marker["flight_plan"]
     print("Virtual drone show extension configured")
     print(f"City World             : {city_world}")
@@ -575,6 +657,8 @@ def configure(args: argparse.Namespace, experiment_path: Path, drone_root: Path)
         f"maximum {experiment.speed_m_s:g} m/s"
     )
     print(f"Show IR                : {show_ir_path}")
+    print(f"Mobile Viewer URL      : {viewer_url}")
+    print(f"Mobile Viewer QR       : {viewer_qr_path}")
     print(
         "Scenario               : takeoff -> "
         + " -> ".join(step["step_id"] for step in show_definition["timeline"])
@@ -640,7 +724,7 @@ def main(argv: list[str] | None = None) -> int:
                 drone_count_override=args.drone_count,
             )
         if args.command == "open-viewer":
-            return base.open_viewer(
+            return _open_viewer(
                 experiment_path, drone_count_override=args.drone_count
             )
         return base.smoke(
