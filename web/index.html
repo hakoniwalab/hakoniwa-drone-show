@@ -50,6 +50,52 @@
           <p id="camera-copy-status" role="status" aria-live="polite"></p>
         </div>
       </section>
+      <details id="city-lighting-panel" hidden>
+        <summary>会場照明を調整</summary>
+        <div class="lighting-controls">
+          <p class="lighting-help">照明を選び、光源または照射先を地図クリックとコンパスで調整します。3D画面の線が選択中の照射方向です。</p>
+          <label class="lighting-slider">街の明るさ <output id="lighting-city-value"></output><input id="lighting-city-brightness" type="range" min="0" max="3" step="0.05"></label>
+          <label class="lighting-select">編集する照明
+            <select id="lighting-select">
+              <option value="0">照明 1（南）</option>
+              <option value="1">照明 2（東）</option>
+              <option value="2">照明 3（北）</option>
+              <option value="3">照明 4（西）</option>
+            </select>
+          </label>
+          <label class="lighting-check"><input id="lighting-enabled" type="checkbox">この照明を有効にする</label>
+          <label class="lighting-slider">照明の明るさ <output id="lighting-light-value"></output><input id="lighting-light-brightness" type="range" min="0" max="5" step="0.05"></label>
+          <label class="lighting-slider">光の広がり <output id="lighting-spread-value"></output><input id="lighting-spread" type="range" min="10" max="70" step="1"></label>
+          <label class="lighting-color">照明色<input id="lighting-color" type="color"></label>
+          <div class="lighting-position">
+            <div class="lighting-edit-mode">
+              <button id="lighting-edit-source" type="button" aria-pressed="false">光源位置</button>
+              <button id="lighting-edit-target" type="button" aria-pressed="true">照射先</button>
+            </div>
+            <div class="lighting-compass" aria-label="照明対象の水平移動">
+              <button type="button" data-lighting-move="north" aria-label="北へ">N</button>
+              <button type="button" data-lighting-move="west" aria-label="西へ">W</button>
+              <span>＋</span>
+              <button type="button" data-lighting-move="east" aria-label="東へ">E</button>
+              <button type="button" data-lighting-move="south" aria-label="南へ">S</button>
+            </div>
+            <div class="lighting-altitude">
+              <button type="button" data-lighting-move="up">高さ＋</button>
+              <button type="button" data-lighting-move="down">高さ－</button>
+            </div>
+            <label>移動幅
+              <select id="lighting-move-step">
+                <option value="1">1 m</option>
+                <option value="5" selected>5 m</option>
+                <option value="10">10 m</option>
+              </select>
+            </label>
+          </div>
+          <p id="lighting-target-value" class="lighting-target-value"></p>
+          <button id="lighting-copy" type="button">YAML設定をコピー</button>
+          <p id="lighting-copy-status" role="status" aria-live="polite"></p>
+        </div>
+      </details>
       <dl>
         <div><dt>表示中の機体</dt><dd id="drone-count">0 / 0</dd></div>
         <div><dt>通信</dt><dd>WebSocket :8765</dd></div>

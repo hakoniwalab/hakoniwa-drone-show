@@ -264,6 +264,18 @@ class ShowRuntimeTest(unittest.TestCase):
                                 "scale": 2.0,
                                 "intensity": 1.75,
                             },
+                            "city_lighting": {
+                                "enabled": True,
+                                "brightness": 1.4,
+                                "lights": [{
+                                    "enabled": True,
+                                    "position_m": [1.0, -20.0, 7.0],
+                                    "target_m": [1.0, 2.0, 24.0],
+                                    "brightness": 1.2,
+                                    "spread_deg": 42.0,
+                                    "color": "#ffd6a0",
+                                }],
+                            },
                             "crowd": {
                                 "enabled": True,
                                 "count": 240,
@@ -351,6 +363,21 @@ class ShowRuntimeTest(unittest.TestCase):
             self.assertEqual(
                 runtime["camera"],
                 {"initial_mode": "audience", "audience_available": True},
+            )
+            self.assertEqual(
+                runtime["city_lighting"],
+                {
+                    "enabled": True,
+                    "brightness": 1.4,
+                    "lights": [{
+                        "enabled": True,
+                        "position_m": [1.0, -20.0, 7.0],
+                        "target_m": [1.0, 2.0, 24.0],
+                        "brightness": 1.2,
+                        "spread_deg": 42.0,
+                        "color": "#ffd6a0",
+                    }],
+                },
             )
             self.assertEqual(
                 runtime["crowd"],

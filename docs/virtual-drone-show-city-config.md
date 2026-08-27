@@ -102,6 +102,15 @@ Worldにおける中央離陸地点の高さへ合わせています。
 | `viewer.led_appearance.scale` | 0より大きく4以下 | LEDスプライト全体の表示サイズ倍率です。機体間隔やFormation寸法は変わりません。既定値は`1.45`です。 |
 | `viewer.led_appearance.intensity` | 0より大きく4以下 | Show Planで解決された機体別brightnessへ掛ける、画面表示全体の発光強度倍率です。既定値は`1.25`です。 |
 | `viewer.led_appearance.spatial_depth_cue` | 真偽値 | `true`では近距離のLEDハローを抑え、立体LEDコアと白い機体を見せます。遠距離では従来どおりLEDを強調します。 |
+| `viewer.city_lighting.enabled` | 真偽値 | PLATEAU Viewerの夜間会場照明を有効にします。`flat`では無効になります。 |
+| `viewer.city_lighting.brightness` | 0〜3 | 街全体の明るさ倍率です。内部で環境光・方向光・天空光・露出をまとめて調整します。 |
+| `viewer.city_lighting.lights.light1`〜`light4` | マッピング | 固定4スロットの会場照明です。省略したスロットには既定値が入ります。 |
+| `viewer.city_lighting.lights.lightN.enabled` | 真偽値 | その照明を有効にします。 |
+| `viewer.city_lighting.lights.lightN.position_m` | 3要素の数値配列 | 光源を置くローカルENU座標`[East, North, Up]`（m）です。 |
+| `viewer.city_lighting.lights.lightN.target_m` | 3要素の数値配列 | 照射先のローカルENU座標`[East, North, Up]`（m）です。光源から照射先への向きが照射方向になります。 |
+| `viewer.city_lighting.lights.lightN.brightness` | 0〜5 | その照明の明るさ倍率です。 |
+| `viewer.city_lighting.lights.lightN.spread_deg` | 10〜70 | その照明の広がりです。 |
+| `viewer.city_lighting.lights.lightN.color` | `#RRGGBB` | 照明色です。暖色の既定値は`#ffd6a0`です。 |
 | `viewer.crowd.enabled` | 真偽値 | PLATEAU Viewer上の簡易観客演出を有効にします。`flat`とARページには表示しません。 |
 | `viewer.crowd.count` | 1〜2000の整数 | 表示する簡易観客数です。人物は`InstancedMesh`で描画され、物理・PDUには追加されません。 |
 | `viewer.crowd.center_m` | 2要素の数値配列 | 観客配置矩形の中心`[East, North]`（m）です。 |
@@ -125,6 +134,14 @@ Worldにおける中央離陸地点の高さへ合わせています。
 
 `viewer.led_appearance`はThree.js上の見え方だけを調整します。Show PlanのLED
 `brightness`（0〜1）は機体・フレーム別の演出値であり、こちらの設定では変更しません。
+
+`viewer.city_lighting`を有効にすると、左パネルへ折りたたみ式の`会場照明を調整`が表示されます。
+街の明るさと、選択中の照明の有効状態・明るさ・広がり・色は即座にViewerへ反映されます。
+照明1〜4をセレクトで切り替え、`光源位置`または`照射先`を選びます。調整パネルを開いている間は
+3D画面に選択中の光源、照射先、照射線が表示されます。位置は地図クリック、東西南北のコンパス、
+高さボタンで移動できます。`YAML設定をコピー`で4灯すべての現在値をコピーし、
+City experiment YAMLの`viewer`直下へ貼り付けてから`configure`を再実行してください。
+ブラウザ上の変更だけでは次回起動時の設定は変わりません。
 
 `viewer.crowd`は会場の無人感を抑えるための見栄え優先の演出です。観客はFormation方向へ
 向いた明るい簡易人型として決定論的に配置され、一部はスマートフォンの光を持ちます。

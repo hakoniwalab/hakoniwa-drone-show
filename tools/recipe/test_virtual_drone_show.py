@@ -152,6 +152,48 @@ scenario:
         self.assertIn("createAudienceCrowd(runtime.crowd", app)
         self.assertIn("viewer.addSceneDecoration(crowd)", app)
 
+    def test_city_lighting_has_browser_controls_and_yaml_copy(self) -> None:
+        page = (recipe.SHOW_ROOT / "web" / "index.html").read_text(encoding="utf-8")
+        app = (recipe.SHOW_ROOT / "web" / "drone-show-app.mjs").read_text(
+            encoding="utf-8"
+        )
+        lighting = (recipe.SHOW_ROOT / "web" / "city-lighting.mjs").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('id="city-lighting-panel"', page)
+        self.assertIn('id="lighting-copy"', page)
+        self.assertIn("viewer.setNightLighting", app)
+        self.assertIn("cityLightingYaml(state)", app)
+        self.assertIn("new THREE.SpotLight", lighting)
+
+    def test_city_lighting_settings_are_normalized(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            experiment = Path(temporary) / "experiment.yaml"
+            experiment.write_text(
+                """viewer:
+  city_lighting:
+    enabled: true
+    brightness: 1.4
+    lights:
+      light1:
+        enabled: true
+        position_m: [1, -20, 7]
+        target_m: [1, 2, 24]
+        brightness: 1.2
+        spread_deg: 42
+        color: \"#FFD6A0\"
+""",
+                encoding="utf-8",
+            )
+            lighting = recipe._viewer_settings(experiment)["city_lighting"]
+            self.assertEqual(lighting["brightness"], 1.4)
+            self.assertEqual(len(lighting["lights"]), 4)
+            self.assertEqual(lighting["lights"][0]["position_m"], [1.0, -20.0, 7.0])
+            self.assertEqual(lighting["lights"][0]["target_m"], [1.0, 2.0, 24.0])
+            self.assertEqual(lighting["lights"][0]["brightness"], 1.2)
+            self.assertEqual(lighting["lights"][0]["spread_deg"], 42.0)
+            self.assertEqual(lighting["lights"][0]["color"], "#ffd6a0")
+
     def test_ar_page_uses_camera_overlay_and_direction_guide(self) -> None:
         ar_root = recipe.SHOW_ROOT / "web" / "ar"
         page = (ar_root / "index.html").read_text(encoding="utf-8")

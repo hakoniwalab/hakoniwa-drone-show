@@ -5,7 +5,7 @@ experiment:
   id: drone-fleet-single-host-mujoco-city-2
 
 scale:
-  drone_count: 180
+  drone_count: 200
   process_count: 8
 
 runtime:
@@ -16,7 +16,7 @@ runtime:
 environment:
   mode: plateau
   plateau:
-    city_world_receipt: ../../../hakoniwa-business-pack/work/remote-operation/city-world-worker/jobs/shizuoka-22203-lat35.099-lon138.859/build/world/city-world-receipt.json
+    city_world_receipt: ../../../hakoniwa-business-pack/work/remote-operation/city-world-worker/jobs/osaka-27100-lat34.687-lon135.526/build/world/city-world-receipt.json
     altitude_mode: route-clearance
   flat:
     ground_height_m: 5.479387621660862
@@ -33,8 +33,40 @@ viewer:
     scale: 1.0
     intensity: 1.0
     spatial_depth_cue: true
-  crowd:
+  city_lighting:
     enabled: true
+    brightness: 1.0
+    lights:
+      light1:
+        enabled: true
+        position_m: [0.0, -30.0, 8.0]
+        target_m: [0.0, 0.0, 20.0]
+        brightness: 1.0
+        spread_deg: 35.0
+        color: "#ffd6a0"
+      light2:
+        enabled: true
+        position_m: [30.0, 0.0, 8.0]
+        target_m: [0.0, 0.0, 20.0]
+        brightness: 0.7
+        spread_deg: 35.0
+        color: "#ffd6a0"
+      light3:
+        enabled: true
+        position_m: [0.0, 30.0, 8.0]
+        target_m: [0.0, 0.0, 20.0]
+        brightness: 0.45
+        spread_deg: 35.0
+        color: "#ffd6a0"
+      light4:
+        enabled: true
+        position_m: [-30.0, 0.0, 8.0]
+        target_m: [0.0, 0.0, 20.0]
+        brightness: 0.7
+        spread_deg: 35.0
+        color: "#ffd6a0"
+  crowd:
+    enabled: false
     count: 240
     center_m: [0.0, -34.0]
     width_m: 44.0
@@ -51,7 +83,7 @@ viewer:
     fov_deg: 76.43
 
 ar:
-  enabled: true
+  enabled: false
   venue:
     latitude: 35.0988
     longitude: 138.8587

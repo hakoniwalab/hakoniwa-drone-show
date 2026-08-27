@@ -17,6 +17,7 @@ import json
 import math
 import os
 import platform
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -556,6 +557,7 @@ def _viewer_settings(experiment_path: Path) -> dict:
             "initial_mode",
             "audience_camera",
             "led_appearance",
+            "city_lighting",
             "crowd",
             "network",
         }
@@ -618,6 +620,124 @@ def _viewer_settings(experiment_path: Path) -> dict:
             )
         resolved_led["spatial_depth_cue"] = spatial_depth_cue
         settings["led_appearance"] = resolved_led
+    city_lighting = viewer.get("city_lighting")
+    if city_lighting is not None:
+        if not isinstance(city_lighting, dict):
+            raise base.RecipeError("viewer.city_lighting must be a mapping")
+        unknown_city_lighting = sorted(
+            set(city_lighting) - {"enabled", "brightness", "lights"}
+        )
+        if unknown_city_lighting:
+            raise base.RecipeError(
+                "viewer.city_lighting has unknown fields: "
+                + ", ".join(unknown_city_lighting)
+            )
+        city_enabled = city_lighting.get("enabled", True)
+        if not isinstance(city_enabled, bool):
+            raise base.RecipeError("viewer.city_lighting.enabled must be boolean")
+        brightness = city_lighting.get("brightness", 1.0)
+        if (
+            not isinstance(brightness, (int, float))
+            or isinstance(brightness, bool)
+            or not math.isfinite(float(brightness))
+            or not 0.0 <= float(brightness) <= 3.0
+        ):
+            raise base.RecipeError(
+                "viewer.city_lighting.brightness must be within [0, 3]"
+            )
+        resolved_city_lighting = {
+            "enabled": city_enabled,
+            "brightness": float(brightness),
+        }
+        default_lights = (
+            {"position_m": [0.0, -30.0, 8.0], "brightness": 1.0},
+            {"position_m": [30.0, 0.0, 8.0], "brightness": 0.7},
+            {"position_m": [0.0, 30.0, 8.0], "brightness": 0.45},
+            {"position_m": [-30.0, 0.0, 8.0], "brightness": 0.7},
+        )
+        lights = city_lighting.get("lights", {})
+        if not isinstance(lights, dict):
+            raise base.RecipeError(
+                "viewer.city_lighting.lights must be a mapping"
+            )
+        unknown_light_slots = sorted(
+            set(lights) - {"light1", "light2", "light3", "light4"}
+        )
+        if unknown_light_slots:
+            raise base.RecipeError(
+                "viewer.city_lighting.lights has unknown fields: "
+                + ", ".join(unknown_light_slots)
+            )
+        resolved_lights = []
+        for index, defaults in enumerate(default_lights):
+            slot = f"light{index + 1}"
+            light = lights.get(slot, {})
+            if not isinstance(light, dict):
+                raise base.RecipeError(
+                    f"viewer.city_lighting.lights[{index}] must be a mapping"
+                )
+            unknown_light = sorted(
+                set(light)
+                - {"enabled", "position_m", "target_m", "brightness", "spread_deg", "color"}
+            )
+            if unknown_light:
+                raise base.RecipeError(
+                    f"viewer.city_lighting.lights[{index}] has unknown fields: "
+                    + ", ".join(unknown_light)
+                )
+            light_enabled = light.get("enabled", True)
+            if not isinstance(light_enabled, bool):
+                raise base.RecipeError(
+                    f"viewer.city_lighting.lights[{index}].enabled must be boolean"
+                )
+            resolved_light = {"enabled": light_enabled}
+            for key, fallback in (
+                ("position_m", defaults["position_m"]),
+                ("target_m", [0.0, 0.0, 20.0]),
+            ):
+                vector = light.get(key, fallback)
+                if (
+                    not isinstance(vector, list)
+                    or len(vector) != 3
+                    or any(
+                        not isinstance(value, (int, float))
+                        or isinstance(value, bool)
+                        or not math.isfinite(float(value))
+                        or abs(float(value)) > 10000.0
+                        for value in vector
+                    )
+                ):
+                    raise base.RecipeError(
+                        f"viewer.city_lighting.lights[{index}].{key} must contain three finite ENU values within [-10000, 10000]"
+                    )
+                resolved_light[key] = [float(value) for value in vector]
+            for key, default, minimum, maximum in (
+                ("brightness", defaults["brightness"], 0.0, 5.0),
+                ("spread_deg", 35.0, 10.0, 70.0),
+            ):
+                value = light.get(key, default)
+                if (
+                    not isinstance(value, (int, float))
+                    or isinstance(value, bool)
+                    or not math.isfinite(float(value))
+                    or not minimum <= float(value) <= maximum
+                ):
+                    raise base.RecipeError(
+                        f"viewer.city_lighting.lights[{index}].{key} must be within [{minimum:g}, {maximum:g}]"
+                    )
+                resolved_light[key] = float(value)
+            light_color = light.get("color", "#ffd6a0")
+            if (
+                not isinstance(light_color, str)
+                or re.fullmatch(r"#[0-9A-Fa-f]{6}", light_color) is None
+            ):
+                raise base.RecipeError(
+                    f"viewer.city_lighting.lights[{index}].color must be #RRGGBB"
+                )
+            resolved_light["color"] = light_color.lower()
+            resolved_lights.append(resolved_light)
+        resolved_city_lighting["lights"] = resolved_lights
+        settings["city_lighting"] = resolved_city_lighting
     crowd = viewer.get("crowd")
     if crowd is not None:
         if not isinstance(crowd, dict):

@@ -586,6 +586,12 @@ def materialize_browser(
                 ),
             }
         )
+    city_lighting = viewer_settings.get("city_lighting", {"enabled": False})
+    city_lighting_runtime = dict(city_lighting)
+    city_lighting_runtime["enabled"] = bool(
+        marker.get("backend") == "mujoco-city"
+        and city_lighting.get("enabled") is True
+    )
     if audience is not None:
         viewer_config["three"]["audienceCamera"] = {
             "positionM": audience["position_m"],
@@ -618,6 +624,7 @@ def materialize_browser(
             "audience_available": audience is not None,
         },
         "crowd": crowd_runtime,
+        "city_lighting": city_lighting_runtime,
         "ar": {
             **show_config.get("ar", {"enabled": False}),
             "ground_height_m": float(
