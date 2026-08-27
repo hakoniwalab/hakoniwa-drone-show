@@ -34,7 +34,8 @@
           <button id="camera-audience" type="button" aria-pressed="false">観客視点</button>
           <button id="camera-free" type="button" aria-pressed="false">自由視点</button>
         </div>
-        <p id="camera-help" hidden>矢印: 前後左右 / U・D: 上下 / Shift: 高速<br>左ドラッグ: 横向き / 右ドラッグ: 仰角 / ホイール: 画角<br>スマホ: 1本指で横向き・仰角 / ピンチで画角</p>
+        <button id="camera-movement-toggle" type="button" aria-pressed="false" hidden>移動操作 OFF</button>
+        <p id="camera-help" hidden>矢印: 前後左右 / U・D: 上下 / Shift: 高速<br>左ドラッグ: 横向き / 右ドラッグ: 仰角 / ホイール: 画角<br>移動操作ON: 透明ボタンで位置移動<br>スマホ: 1本指で横向き・仰角 / ピンチで画角</p>
         <div id="camera-state" hidden>
           <p class="camera-coordinate-label">現在値（ENU）</p>
           <dl class="camera-values">
@@ -61,6 +62,18 @@
     </aside>
     <section id="viewer-area">
       <div id="three-root"></div>
+      <div id="camera-movement-controls" aria-label="観客カメラ位置移動" hidden>
+        <div class="camera-movement-dpad">
+          <button type="button" data-camera-move="forward" aria-label="前進">▲</button>
+          <button type="button" data-camera-move="left" aria-label="左移動">◀</button>
+          <button type="button" data-camera-move="backward" aria-label="後退">▼</button>
+          <button type="button" data-camera-move="right" aria-label="右移動">▶</button>
+        </div>
+        <div class="camera-movement-altitude">
+          <button type="button" data-camera-move="up" aria-label="上昇">上昇</button>
+          <button type="button" data-camera-move="down" aria-label="下降">下降</button>
+        </div>
+      </div>
     </section>
   </main>
   <script type="module" src="./drone-show-app.mjs"></script>

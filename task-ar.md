@@ -136,6 +136,7 @@ AR-4: 会場位置、仮想観客位置、配置調整
 - [x] configureでスマホ向けURLのQRコードを生成する
 - [x] LAN上のHTTPでもShow IRのSHA-256を検証できるfallbackを追加する
 - [x] スマートフォンの観客視点で1本指yaw/pitch・ピンチFOVを操作できるようにする
+- [x] PC・スマートフォン共通で、観客位置を固定できる移動操作OFFと前後左右・上下の半透明ボタンを追加する
 - [x] この段階ではCity World、PLATEAU、Viewer UI、PDU周期を変更しない
 
 ### Acceptance Test

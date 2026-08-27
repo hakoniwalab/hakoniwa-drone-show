@@ -123,12 +123,18 @@ scenario:
         self.assertIn('id="camera-free"', page)
         self.assertIn('id="camera-state"', page)
         self.assertIn('id="camera-copy"', page)
+        self.assertIn('id="camera-movement-toggle"', page)
+        self.assertIn('id="camera-movement-controls"', page)
+        for movement in ("forward", "backward", "left", "right", "up", "down"):
+            self.assertIn(f'data-camera-move="{movement}"', page)
         self.assertIn("現在値（ENU）", page)
         app = (recipe.SHOW_ROOT / "web" / "drone-show-app.mjs").read_text(
             encoding="utf-8"
         )
         self.assertIn("getAudienceCameraState", app)
         self.assertIn("audienceCameraYaml", app)
+        self.assertIn("setAudienceCameraMovementInput", app)
+        self.assertIn("setCameraMovementEnabled", app)
 
     def test_default_sources_use_sibling_repositories(self) -> None:
         self.assertEqual(

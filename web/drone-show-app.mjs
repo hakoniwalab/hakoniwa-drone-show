@@ -10,6 +10,8 @@ const ui = {
   droneCount: document.getElementById('drone-count'),
   cameraAudience: document.getElementById('camera-audience'),
   cameraFree: document.getElementById('camera-free'),
+  cameraMovementToggle: document.getElementById('camera-movement-toggle'),
+  cameraMovementControls: document.getElementById('camera-movement-controls'),
   cameraHelp: document.getElementById('camera-help'),
   cameraState: document.getElementById('camera-state'),
   cameraX: document.getElementById('camera-x'),
@@ -37,6 +39,34 @@ const markers = new Map();
 const ledStatesByDroneId = new Map();
 const START_RETRY_TIMEOUT_MSEC = 3000;
 let cameraCopyStatusTimer = null;
+let audienceCameraEnabled = false;
+let cameraMovementEnabled = false;
+const cameraMovementPointers = new Map();
+
+function applyCameraMovementInput() {
+  const actions = new Set(cameraMovementPointers.values());
+  for (const button of ui.cameraMovementControls.querySelectorAll('button')) {
+    button.dataset.active = String(actions.has(button.dataset.cameraMove));
+  }
+  viewer?.setAudienceCameraMovementInput?.({
+    forward: Number(actions.has('forward')) - Number(actions.has('backward')),
+    right: Number(actions.has('right')) - Number(actions.has('left')),
+    up: Number(actions.has('up')) - Number(actions.has('down')),
+  });
+}
+
+function clearCameraMovementInput() {
+  cameraMovementPointers.clear();
+  applyCameraMovementInput();
+}
+
+function setCameraMovementEnabled(enabled) {
+  cameraMovementEnabled = !!enabled && audienceCameraEnabled;
+  ui.cameraMovementToggle.setAttribute('aria-pressed', String(cameraMovementEnabled));
+  ui.cameraMovementToggle.textContent = cameraMovementEnabled ? '移動操作 ON' : '移動操作 OFF';
+  ui.cameraMovementControls.hidden = !cameraMovementEnabled;
+  if (!cameraMovementEnabled) clearCameraMovementInput();
+}
 
 function refreshAudienceCameraState() {
   const state = viewer?.getAudienceCameraState?.();
@@ -87,6 +117,9 @@ function setCameraMode(mode) {
   if (!changed && audience) return false;
   ui.cameraAudience.setAttribute('aria-pressed', String(audience));
   ui.cameraFree.setAttribute('aria-pressed', String(!audience));
+  audienceCameraEnabled = audience;
+  ui.cameraMovementToggle.hidden = !audience;
+  if (!audience) setCameraMovementEnabled(false);
   ui.cameraHelp.hidden = !audience;
   refreshAudienceCameraState();
   return true;
@@ -328,6 +361,32 @@ ui.start.addEventListener('click', async () => {
 
 ui.cameraAudience.addEventListener('click', () => setCameraMode('audience'));
 ui.cameraFree.addEventListener('click', () => setCameraMode('free'));
+ui.cameraMovementToggle.addEventListener('click', () => {
+  setCameraMovementEnabled(!cameraMovementEnabled);
+});
+for (const button of ui.cameraMovementControls.querySelectorAll('[data-camera-move]')) {
+  const release = (event) => {
+    if (!cameraMovementPointers.has(event.pointerId)) return;
+    cameraMovementPointers.delete(event.pointerId);
+    button.releasePointerCapture?.(event.pointerId);
+    applyCameraMovementInput();
+  };
+  button.addEventListener('pointerdown', (event) => {
+    if (!cameraMovementEnabled) return;
+    event.preventDefault();
+    cameraMovementPointers.set(event.pointerId, button.dataset.cameraMove);
+    button.dataset.active = 'true';
+    button.setPointerCapture?.(event.pointerId);
+    applyCameraMovementInput();
+  });
+  button.addEventListener('pointerup', release);
+  button.addEventListener('pointercancel', release);
+  button.addEventListener('lostpointercapture', release);
+}
+window.addEventListener('blur', clearCameraMovementInput);
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) clearCameraMovementInput();
+});
 ui.cameraCopy.addEventListener('click', async () => {
   const state = refreshAudienceCameraState();
   if (!state) return;
@@ -340,6 +399,7 @@ ui.cameraCopy.addEventListener('click', async () => {
 });
 
 window.addEventListener('beforeunload', () => {
+  clearCameraMovementInput();
   clearStartPending();
   if (cameraCopyStatusTimer !== null) window.clearTimeout(cameraCopyStatusTimer);
   controlClient?.stop();
