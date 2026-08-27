@@ -14,6 +14,7 @@ Hakoniwa向けバーチャルドローンショーの制作、計画、検証お
 - PRO環境を前提とするバーチャルドローンショー専用Recipeとexperiment
 - iPhone/Android共通のカメラ重畳ARプレビュー
 - 平面Formationを実3D座標へ湾曲させる奥行き演出と距離適応LED
+- PLATEAU会場の無人感を抑える軽量な観客演出
 
 ## 実装配置の原則
 

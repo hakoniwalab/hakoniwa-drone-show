@@ -33,10 +33,21 @@ viewer:
     scale: 1.0
     intensity: 1.0
     spatial_depth_cue: true
+  crowd:
+    enabled: true
+    count: 240
+    center_m: [0.0, -34.0]
+    width_m: 44.0
+    depth_m: 16.0
+    ground_height_m: 5.5
+    lighting:
+      enabled: true
+      intensity: 140.0
+      height_m: 4.0
   audience_camera:
-    position_m: [12.42, -37.79, 6.00]
-    yaw_deg: 114.93
-    pitch_deg: 24.92
+    position_m: [4.93, -68.05, 9.50]
+    yaw_deg: 111.22
+    pitch_deg: 12.59
     fov_deg: 76.43
 
 ar:

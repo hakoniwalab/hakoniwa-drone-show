@@ -2,6 +2,7 @@ import { ShowControlClient } from './show-control-client.mjs';
 import { audienceCameraYaml, displayAudienceCameraState } from './audience-camera-config.mjs';
 import { ledStatesForFrame, rgbCss, validateShowIrForViewer } from './show-led-timeline.mjs';
 import { bytesToHex, sha256Bytes } from './sha256.mjs';
+import { createAudienceCrowd } from './audience-crowd.mjs';
 
 const ui = {
   state: document.getElementById('show-state'),
@@ -281,6 +282,8 @@ async function initialize() {
       ? 'audience'
       : 'free',
   );
+  const crowd = createAudienceCrowd(runtime.crowd, viewer.getAudienceCameraState?.());
+  if (crowd) viewer.addSceneDecoration(crowd);
   viewer.setNightMode(true);
   if (runtime.led_appearance) {
     if (typeof viewer.setDroneLedAppearance !== 'function') {

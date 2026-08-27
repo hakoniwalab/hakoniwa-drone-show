@@ -102,6 +102,15 @@ Worldにおける中央離陸地点の高さへ合わせています。
 | `viewer.led_appearance.scale` | 0より大きく4以下 | LEDスプライト全体の表示サイズ倍率です。機体間隔やFormation寸法は変わりません。既定値は`1.45`です。 |
 | `viewer.led_appearance.intensity` | 0より大きく4以下 | Show Planで解決された機体別brightnessへ掛ける、画面表示全体の発光強度倍率です。既定値は`1.25`です。 |
 | `viewer.led_appearance.spatial_depth_cue` | 真偽値 | `true`では近距離のLEDハローを抑え、立体LEDコアと白い機体を見せます。遠距離では従来どおりLEDを強調します。 |
+| `viewer.crowd.enabled` | 真偽値 | PLATEAU Viewer上の簡易観客演出を有効にします。`flat`とARページには表示しません。 |
+| `viewer.crowd.count` | 1〜2000の整数 | 表示する簡易観客数です。人物は`InstancedMesh`で描画され、物理・PDUには追加されません。 |
+| `viewer.crowd.center_m` | 2要素の数値配列 | 観客配置矩形の中心`[East, North]`（m）です。 |
+| `viewer.crowd.width_m` | 0より大きく500以下 | 観客配置矩形のEast方向の幅です。 |
+| `viewer.crowd.depth_m` | 0より大きく500以下 | 観客配置矩形のNorth方向の奥行きです。Formationの湾曲量とは別設定です。 |
+| `viewer.crowd.ground_height_m` | 有限数、省略可能 | 観客の足元を置くローカルZ（m）です。省略時は飛行計画の高度基準を使いますが、道路面とずれる場合は画面を見ながら調整します。静岡の既定値は`5.5`mです。 |
+| `viewer.crowd.lighting.enabled` | 真偽値 | 観客エリア四隅の簡易イベント照明を有効にします。 |
+| `viewer.crowd.lighting.intensity` | 0〜1000 | 各照明のPointLight強度です。既定値は`140`です。 |
+| `viewer.crowd.lighting.height_m` | 0〜50 | 観客の足元から照明までの高さ（m）です。既定値は`4`mです。 |
 | `viewer.audience_camera.position_m` | 3要素の数値配列 | 観客カメラの初期位置をローカルENU座標`[East, North, Up]`（m）で指定します。 |
 | `viewer.audience_camera.yaw_deg` | 数値 | 水平向きです。0度はEast、正方向はNorth側です。 |
 | `viewer.audience_camera.pitch_deg` | -85〜85 | 仰角です。0度は水平、正方向は上です。 |
@@ -116,6 +125,13 @@ Worldにおける中央離陸地点の高さへ合わせています。
 
 `viewer.led_appearance`はThree.js上の見え方だけを調整します。Show PlanのLED
 `brightness`（0〜1）は機体・フレーム別の演出値であり、こちらの設定では変更しません。
+
+`viewer.crowd`は会場の無人感を抑えるための見栄え優先の演出です。観客はFormation方向へ
+向いた明るい簡易人型として決定論的に配置され、一部はスマートフォンの光を持ちます。
+夜間照明で黒いシルエットにならないよう、人物色は照明非依存です。terrainの細かな起伏や
+歩道境界への厳密な追従は行わないため、配置範囲から多少はみ出す場合があります。
+照明を有効にすると、配置範囲の四隅に暖色と淡い青の光源を交互に置き、足元にも薄い光だまりを
+表示します。会場の寂しさを抑えるための演出であり、MuJoCoの物理世界には追加されません。
 
 スマホ表示ではMacとスマホを同じLANへ接続し、`viewer.network.host`へMacのLAN IPを
 設定して`configure`を再実行します。`open-viewer`が表示するURLをスマホで開いてください。

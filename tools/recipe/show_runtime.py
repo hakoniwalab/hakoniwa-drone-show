@@ -558,6 +558,34 @@ def materialize_browser(
         raise ShowRuntimeError(
             "drone_show.viewer.led_appearance.spatial_depth_cue must be boolean"
         )
+    crowd = viewer_settings.get("crowd")
+    crowd_enabled = (
+        marker.get("backend") == "mujoco-city"
+        and isinstance(crowd, dict)
+        and crowd.get("enabled") is True
+    )
+    crowd_runtime = {"enabled": crowd_enabled}
+    if crowd_enabled:
+        crowd_runtime.update(
+            {
+                "count": int(crowd["count"]),
+                "center_m": [float(value) for value in crowd["center_m"]],
+                "width_m": float(crowd["width_m"]),
+                "depth_m": float(crowd["depth_m"]),
+                "ground_height_m": float(
+                    crowd.get(
+                        "ground_height_m",
+                        marker.get("flight_plan", {}).get(
+                            "altitude_reference_height_m", 0.0
+                        ),
+                    )
+                ),
+                "lighting": crowd.get(
+                    "lighting",
+                    {"enabled": False, "intensity": 140.0, "height_m": 4.0},
+                ),
+            }
+        )
     if audience is not None:
         viewer_config["three"]["audienceCamera"] = {
             "positionM": audience["position_m"],
@@ -589,6 +617,7 @@ def materialize_browser(
             "initial_mode": initial_mode,
             "audience_available": audience is not None,
         },
+        "crowd": crowd_runtime,
         "ar": {
             **show_config.get("ar", {"enabled": False}),
             "ground_height_m": float(

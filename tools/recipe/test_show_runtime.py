@@ -247,7 +247,9 @@ class ShowRuntimeTest(unittest.TestCase):
             write_json(
                 marker,
                 {
+                    "backend": "mujoco-city",
                     "drone_count": 2,
+                    "flight_plan": {"altitude_reference_height_m": 13.8},
                     "drone_show": {
                         "viewer": {
                             "network": {"host": "192.168.1.23"},
@@ -261,6 +263,19 @@ class ShowRuntimeTest(unittest.TestCase):
                             "led_appearance": {
                                 "scale": 2.0,
                                 "intensity": 1.75,
+                            },
+                            "crowd": {
+                                "enabled": True,
+                                "count": 240,
+                                "center_m": [0.0, -34.0],
+                                "width_m": 44.0,
+                                "depth_m": 16.0,
+                                "ground_height_m": 5.5,
+                                "lighting": {
+                                    "enabled": True,
+                                    "intensity": 140.0,
+                                    "height_m": 4.0,
+                                },
                             },
                         },
                         "ar": {
@@ -328,7 +343,7 @@ class ShowRuntimeTest(unittest.TestCase):
                 },
             )
             self.assertTrue(runtime["ar"]["enabled"])
-            self.assertEqual(runtime["ar"]["ground_height_m"], 0.0)
+            self.assertEqual(runtime["ar"]["ground_height_m"], 13.8)
             self.assertEqual(
                 runtime["ar"]["secure_websocket_url"],
                 "wss://192.168.1.23:8443/pdu",
@@ -336,6 +351,22 @@ class ShowRuntimeTest(unittest.TestCase):
             self.assertEqual(
                 runtime["camera"],
                 {"initial_mode": "audience", "audience_available": True},
+            )
+            self.assertEqual(
+                runtime["crowd"],
+                {
+                    "enabled": True,
+                    "count": 240,
+                    "center_m": [0.0, -34.0],
+                    "width_m": 44.0,
+                    "depth_m": 16.0,
+                    "ground_height_m": 5.5,
+                    "lighting": {
+                        "enabled": True,
+                        "intensity": 140.0,
+                        "height_m": 4.0,
+                    },
+                },
             )
             self.assertEqual(
                 runtime["websocket_url"], "ws://192.168.1.23:8765"

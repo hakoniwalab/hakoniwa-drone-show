@@ -118,6 +118,7 @@ scenario:
         panel_start = page.index('<aside id="show-panel">')
         panel_end = page.index("</aside>", panel_start)
         self.assertIn('<section id="map-panel"', page[panel_start:panel_end])
+
         self.assertNotIn('id="splitter"', page)
         self.assertIn("#three-root { width: 100%; height: 100%;", style)
         self.assertIn('id="camera-audience"', page)
@@ -136,6 +137,20 @@ scenario:
         self.assertIn("audienceCameraYaml", app)
         self.assertIn("setAudienceCameraMovementInput", app)
         self.assertIn("setCameraMovementEnabled", app)
+
+    def test_plateau_crowd_uses_instanced_viewer_decoration(self) -> None:
+        crowd = (recipe.SHOW_ROOT / "web" / "audience-crowd.mjs").read_text(
+            encoding="utf-8"
+        )
+        app = (recipe.SHOW_ROOT / "web" / "drone-show-app.mjs").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("new THREE.InstancedMesh", crowd)
+        self.assertIn("new THREE.PointLight", crowd)
+        self.assertIn("new THREE.CircleGeometry", crowd)
+        self.assertIn("drone-show-audience-crowd", crowd)
+        self.assertIn("createAudienceCrowd(runtime.crowd", app)
+        self.assertIn("viewer.addSceneDecoration(crowd)", app)
 
     def test_ar_page_uses_camera_overlay_and_direction_guide(self) -> None:
         ar_root = recipe.SHOW_ROOT / "web" / "ar"
@@ -474,9 +489,9 @@ scenario:
             "city-max-clearance",
         )
 
-    def test_flat_environment_resolves_ground_and_origin(self) -> None:
+    def test_default_environment_resolves_plateau_and_flat_settings(self) -> None:
         settings = recipe._environment_settings(recipe.DEFAULT_EXPERIMENT)
-        self.assertEqual(settings["mode"], "flat")
+        self.assertEqual(settings["mode"], "plateau")
         self.assertTrue(
             settings["plateau"]["city_world_receipt"].endswith(
                 "city-world-receipt.json"
@@ -489,6 +504,25 @@ scenario:
             settings["flat"]["ground_height_m"], 5.479387621660862
         )
         self.assertEqual(settings["flat"]["origin"]["latitude"], 35.0988)
+
+    def test_default_viewer_resolves_plateau_crowd(self) -> None:
+        settings = recipe._viewer_settings(recipe.DEFAULT_EXPERIMENT)
+        self.assertEqual(
+            settings["crowd"],
+            {
+                "enabled": True,
+                "count": 240,
+                "center_m": [0.0, -34.0],
+                "width_m": 44.0,
+                "depth_m": 16.0,
+                "ground_height_m": 5.5,
+                "lighting": {
+                    "enabled": True,
+                    "intensity": 140.0,
+                    "height_m": 4.0,
+                },
+            },
+        )
 
     def test_configure_refuses_non_terminated_launcher_session(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

@@ -552,7 +552,13 @@ def _viewer_settings(experiment_path: Path) -> dict:
         raise base.RecipeError("viewer must be a mapping")
     unknown = sorted(
         set(viewer)
-        - {"initial_mode", "audience_camera", "led_appearance", "network"}
+        - {
+            "initial_mode",
+            "audience_camera",
+            "led_appearance",
+            "crowd",
+            "network",
+        }
     )
     if unknown:
         raise base.RecipeError("viewer has unknown fields: " + ", ".join(unknown))
@@ -612,6 +618,112 @@ def _viewer_settings(experiment_path: Path) -> dict:
             )
         resolved_led["spatial_depth_cue"] = spatial_depth_cue
         settings["led_appearance"] = resolved_led
+    crowd = viewer.get("crowd")
+    if crowd is not None:
+        if not isinstance(crowd, dict):
+            raise base.RecipeError("viewer.crowd must be a mapping")
+        unknown_crowd = sorted(
+            set(crowd)
+            - {
+                "enabled",
+                "count",
+                "center_m",
+                "width_m",
+                "depth_m",
+                "ground_height_m",
+                "lighting",
+            }
+        )
+        if unknown_crowd:
+            raise base.RecipeError(
+                "viewer.crowd has unknown fields: " + ", ".join(unknown_crowd)
+            )
+        enabled = crowd.get("enabled", True)
+        count = crowd.get("count", 240)
+        center = crowd.get("center_m", [0.0, -34.0])
+        if not isinstance(enabled, bool):
+            raise base.RecipeError("viewer.crowd.enabled must be boolean")
+        if (
+            not isinstance(count, int)
+            or isinstance(count, bool)
+            or not 1 <= count <= 2000
+        ):
+            raise base.RecipeError("viewer.crowd.count must be within [1, 2000]")
+        if (
+            not isinstance(center, list)
+            or len(center) != 2
+            or any(
+                not isinstance(value, (int, float))
+                or isinstance(value, bool)
+                or not math.isfinite(float(value))
+                for value in center
+            )
+        ):
+            raise base.RecipeError(
+                "viewer.crowd.center_m must contain two finite ENU numbers"
+            )
+        dimensions = {}
+        for key, default in (("width_m", 44.0), ("depth_m", 16.0)):
+            value = crowd.get(key, default)
+            if (
+                not isinstance(value, (int, float))
+                or isinstance(value, bool)
+                or not math.isfinite(float(value))
+                or not 0.0 < float(value) <= 500.0
+            ):
+                raise base.RecipeError(f"viewer.crowd.{key} must be within (0, 500]")
+            dimensions[key] = float(value)
+        settings["crowd"] = {
+            "enabled": enabled,
+            "count": count,
+            "center_m": [float(value) for value in center],
+            **dimensions,
+        }
+        ground_height = crowd.get("ground_height_m")
+        if ground_height is not None:
+            if (
+                not isinstance(ground_height, (int, float))
+                or isinstance(ground_height, bool)
+                or not math.isfinite(float(ground_height))
+            ):
+                raise base.RecipeError(
+                    "viewer.crowd.ground_height_m must be finite"
+                )
+            settings["crowd"]["ground_height_m"] = float(ground_height)
+        lighting = crowd.get("lighting")
+        if lighting is not None:
+            if not isinstance(lighting, dict):
+                raise base.RecipeError("viewer.crowd.lighting must be a mapping")
+            unknown_lighting = sorted(
+                set(lighting) - {"enabled", "intensity", "height_m"}
+            )
+            if unknown_lighting:
+                raise base.RecipeError(
+                    "viewer.crowd.lighting has unknown fields: "
+                    + ", ".join(unknown_lighting)
+                )
+            lights_enabled = lighting.get("enabled", True)
+            if not isinstance(lights_enabled, bool):
+                raise base.RecipeError(
+                    "viewer.crowd.lighting.enabled must be boolean"
+                )
+            resolved_lighting = {"enabled": lights_enabled}
+            for key, default, maximum in (
+                ("intensity", 140.0, 1000.0),
+                ("height_m", 4.0, 50.0),
+            ):
+                value = lighting.get(key, default)
+                if (
+                    not isinstance(value, (int, float))
+                    or isinstance(value, bool)
+                    or not math.isfinite(float(value))
+                    or not 0.0 < float(value) <= maximum
+                ):
+                    raise base.RecipeError(
+                        f"viewer.crowd.lighting.{key} must be within (0, {maximum:g}]"
+                    )
+                resolved_lighting[key] = float(value)
+            settings["crowd"]["lighting"] = resolved_lighting
     camera = viewer.get("audience_camera")
     if initial_mode == "audience" and not isinstance(camera, dict):
         raise base.RecipeError(
