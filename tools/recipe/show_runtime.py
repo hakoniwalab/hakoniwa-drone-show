@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from tools import show_control_protocol as protocol
+from tools import global_wind_protocol as wind_protocol
 from tools.show_compiler import compile_show, transform_formation_positions
 from tools.show_file import ShowFileError, load_show_file
 from tools.svg_to_formation import SvgConversionError, convert_svg
@@ -325,6 +326,12 @@ def show_pdutypes() -> list[dict[str, Any]]:
             "name": protocol.STATUS_PDU_NAME,
             "type": "hako_msgs/DroneShowJsonFrame",
         },
+        {
+            "channel_id": wind_protocol.COMMAND_CHANNEL_ID,
+            "pdu_size": wind_protocol.FRAME_SIZE,
+            "name": wind_protocol.COMMAND_PDU_NAME,
+            "type": "hako_msgs/DroneShowJsonFrame",
+        },
     ]
 
 
@@ -422,6 +429,7 @@ def materialize_bridge_config(base_root: Path, output_root: Path) -> Path:
             "pdu": [
                 {"name": protocol.COMMAND_PDU_NAME, "notify_on_recv": False},
                 {"name": protocol.STATUS_PDU_NAME, "notify_on_recv": True},
+                {"name": wind_protocol.COMMAND_PDU_NAME, "notify_on_recv": False},
             ],
         }
     )
@@ -445,13 +453,24 @@ def materialize_bridge_config(base_root: Path, output_root: Path) -> Path:
             "pdu_name": protocol.STATUS_PDU_NAME,
         }
     ]
+    groups["global_wind_command"] = [
+        {
+            "id": f"{wind_protocol.ROBOT_NAME}.{wind_protocol.COMMAND_PDU_NAME}",
+            "robot_name": wind_protocol.ROBOT_NAME,
+            "pdu_name": wind_protocol.COMMAND_PDU_NAME,
+        }
+    ]
     connections = bridge.setdefault("connections", [])
     connections[:] = [
         item
         for item in connections
         if isinstance(item, dict)
         and item.get("id")
-        not in {"conn_drone_show_command_ws_to_shm", "conn_drone_show_status_shm_to_ws"}
+        not in {
+            "conn_drone_show_command_ws_to_shm",
+            "conn_drone_show_status_shm_to_ws",
+            "conn_global_wind_command_ws_to_shm",
+        }
     ]
     node_id = bridge.get("nodes", [{}])[0].get("id", "web_bridge_fleets_node1")
     connections.extend(
@@ -474,10 +493,70 @@ def materialize_bridge_config(base_root: Path, output_root: Path) -> Path:
                     {"pduKeyGroupId": "drone_show_status", "policyId": "immediate"}
                 ],
             },
+            {
+                "id": "conn_global_wind_command_ws_to_shm",
+                "nodeId": node_id,
+                "source": {"endpointId": "bridge-ws-ep"},
+                "destinations": [{"endpointId": "bridge-shm-ep"}],
+                "transferPdus": [
+                    {"pduKeyGroupId": "global_wind_command", "policyId": "immediate"}
+                ],
+            },
         ]
     )
     _write_json(bridge_path, bridge)
     return output_root
+
+
+def materialize_global_wind_asset_config(
+    output_root: Path, *, pdu_def_path: Path
+) -> Path:
+    """Generate the Global Wind Asset's Endpoint SHM-callback config."""
+
+    output_root = output_root.resolve()
+    output_root.mkdir(parents=True, exist_ok=True)
+    pdu_def_path = pdu_def_path.resolve()
+    endpoint_path = output_root / "endpoint.json"
+    _write_json(
+        endpoint_path,
+        {
+            "name": "global_wind_asset",
+            "cache": "cache.json",
+            "comm": "comm.json",
+            "pdu_def_path": str(pdu_def_path),
+        },
+    )
+    _write_json(
+        output_root / "cache.json",
+        {
+            "type": "buffer",
+            "name": "global_wind_asset_cache",
+            "store": {"mode": "latest"},
+        },
+    )
+    _write_json(
+        output_root / "comm.json",
+        {
+            "protocol": "shm",
+            "impl_type": "callback",
+            "name": "global_wind_asset_shm",
+            "direction": "in",
+            "io": {
+                "robots": [
+                    {
+                        "name": wind_protocol.ROBOT_NAME,
+                        "pdu": [
+                            {
+                                "name": wind_protocol.COMMAND_PDU_NAME,
+                                "notify_on_recv": True,
+                            }
+                        ],
+                    }
+                ]
+            },
+        },
+    )
+    return endpoint_path
 
 
 def materialize_browser(
@@ -644,6 +723,11 @@ def materialize_browser(
             "status_pdu_name": protocol.STATUS_PDU_NAME,
             "frame_size": protocol.FRAME_SIZE,
         },
+        "global_wind": {
+            "robot_name": wind_protocol.ROBOT_NAME,
+            "command_pdu_name": wind_protocol.COMMAND_PDU_NAME,
+            "frame_size": wind_protocol.FRAME_SIZE,
+        },
     }
     _write_json(destination / "runtime-config.json", runtime_config)
     return destination
@@ -719,6 +803,9 @@ def patch_launcher(
     ar_gateway: Path | None = None,
     ar_certificate: Path | None = None,
     ar_private_key: Path | None = None,
+    global_wind_asset: Path | None = None,
+    global_wind_endpoint_config: Path | None = None,
+    pdu_config_path: Path | None = None,
 ) -> Path:
     launcher = _read_json(launcher_path.resolve())
     assets = launcher.get("assets")
@@ -758,6 +845,41 @@ def patch_launcher(
             )
     environment = runner.setdefault("env", {}).setdefault("set", {})
     environment["HAKO_DRONE_ROOT"] = str(drone_root.resolve())
+
+    if global_wind_asset is not None:
+        asset_path = global_wind_asset.resolve()
+        endpoint_config = (
+            global_wind_endpoint_config.resolve()
+            if global_wind_endpoint_config is not None
+            else None
+        )
+        runtime_pdu_config = pdu_config_path.resolve() if pdu_config_path else None
+        if not asset_path.is_file():
+            raise ShowRuntimeError(f"Global Wind Asset does not exist: {asset_path}")
+        if endpoint_config is None or not endpoint_config.is_file():
+            raise ShowRuntimeError("Global Wind Endpoint config does not exist")
+        if runtime_pdu_config is None or not runtime_pdu_config.is_file():
+            raise ShowRuntimeError("Global Wind PDU config does not exist")
+        wind_asset = {
+            "name": "global-wind-asset",
+            "activation_timing": "before_start",
+            "command": runner["command"],
+            "args": [
+                str(asset_path),
+                "--endpoint-config",
+                str(endpoint_config),
+                "--pdu-config-path",
+                str(runtime_pdu_config),
+            ],
+            "cwd": str(asset_path.parent.parent),
+            "depends_on": list(runner.get("depends_on", [])),
+            "delay_sec": 1,
+        }
+        assets[:] = [
+            asset for asset in assets if asset.get("name") != wind_asset["name"]
+        ]
+        runner["depends_on"] = [wind_asset["name"]]
+        assets.insert(assets.index(runner), wind_asset)
 
     bridge_args = bridge.get("args")
     if not isinstance(bridge_args, list) or "--config-root" not in bridge_args:

@@ -73,13 +73,20 @@ DEFAULT_OUTPUT = (
 DRONE_COLLISION_MASK = {"contype": "2", "conaffinity": "1"}
 MODEL_SIZE = {"nstack": "40000000", "nconmax": "500000"}
 DRONE_BODY_PATTERN = re.compile(r"d[1-9][0-9]*_b_drone_base")
-LANDING_GEAR_CLEARANCE_M = 0.20
+LANDING_GEAR_CLEARANCE_M = 0.50
 SPAWN_CLEARANCE_RADIUS_M = 0.75
 SPAWN_DEFAULT_SEPARATION_M = 1.0
 SPAWN_MIN_SEPARATION_M = 0.0
 SPAWN_MAX_SEPARATION_M = 5.0
 SURFACE_MATCH_TOLERANCE_M = 0.15
-MAX_SPAWN_SLOPE_DELTA_M = 0.25
+# A takeoff footprint must be nearly level.  Larger local height differences
+# leave some landing gear unsupported and can flip the vehicle as it settles.
+MAX_SPAWN_SLOPE_DELTA_M = 0.005
+SPAWN_AREA_MARGIN_M = 3.0
+SPAWN_AREA_MAX_HEIGHT_DELTA_M = 0.05
+SPAWN_AREA_SEARCH_RADIUS_M = 100.0
+SPAWN_AREA_SEARCH_STEP_M = 5.0
+SPAWN_AREA_SAMPLE_STEP_M = 1.0
 ALTITUDE_MODES = {"route-clearance", "city-max-clearance"}
 
 
@@ -99,6 +106,42 @@ def _validate_spawn_spacing(spawn_spacing_m: float) -> float:
             f"({SPAWN_MIN_SEPARATION_M}, {SPAWN_MAX_SEPARATION_M}]"
         )
     return value
+
+
+def _resolve_launch_area(
+    launch_area: dict[str, Any] | None,
+) -> tuple[str, tuple[float, float, float], float]:
+    value = (
+        {"mode": "auto", "offset_m": [0.0, 0.0, 0.0]}
+        if launch_area is None
+        else launch_area
+    )
+    if not isinstance(value, dict) or value.get("mode") not in {"auto", "manual"}:
+        raise FleetMujocoError("launch_area.mode must be auto or manual")
+    offset = value.get("offset_m", [0.0, 0.0, 0.0])
+    if not isinstance(offset, (list, tuple)) or len(offset) != 3:
+        raise FleetMujocoError("launch_area.offset_m must contain [x, y, z]")
+    try:
+        resolved = tuple(float(component) for component in offset)
+    except (TypeError, ValueError) as exc:
+        raise FleetMujocoError("launch_area.offset_m must be numeric") from exc
+    if any(not math.isfinite(component) for component in resolved):
+        raise FleetMujocoError("launch_area.offset_m must be finite")
+    if resolved[2] < 0.0 or resolved[2] > 100.0:
+        raise FleetMujocoError("launch_area offset z must be in [0, 100]")
+    if value["mode"] == "auto" and resolved != (0.0, 0.0, 0.0):
+        raise FleetMujocoError("auto launch_area cannot have a non-zero offset")
+    search_radius_m = float(
+        value.get(
+            "search_radius_m",
+            SPAWN_AREA_SEARCH_RADIUS_M if value["mode"] == "auto" else 0.0,
+        )
+    )
+    if not math.isfinite(search_radius_m) or not 0.0 <= search_radius_m <= 500.0:
+        raise FleetMujocoError("launch_area.search_radius_m must be in [0, 500]")
+    if value["mode"] == "manual" and search_radius_m != 0.0:
+        raise FleetMujocoError("manual launch_area cannot have a search radius")
+    return str(value["mode"]), resolved, search_radius_m
 
 
 def _city_visual_max_height(city_receipt_path: Path) -> tuple[float, Path]:
@@ -218,14 +261,22 @@ def _sha256(path: Path) -> str:
 
 
 def _candidate_spawn_centers(
-    half_extent_m: dict[str, Any], *, spacing_m: float = SPAWN_DEFAULT_SEPARATION_M
+    half_extent_m: dict[str, Any], *, spacing_m: float = SPAWN_DEFAULT_SEPARATION_M,
+    center_m: tuple[float, float] = (0.0, 0.0),
+    max_radius_m: float = 40.0,
 ) -> list[tuple[float, float]]:
+    spacing_m = max(float(spacing_m), SPAWN_CLEARANCE_RADIUS_M)
     north_south = float(half_extent_m.get("north_south", 0.0))
     east_west = float(half_extent_m.get("east_west", 0.0))
     limit_x = max(0.0, north_south - SPAWN_CLEARANCE_RADIUS_M)
     limit_y = max(0.0, east_west - SPAWN_CLEARANCE_RADIUS_M)
-    max_ring = int(min(max(limit_x, limit_y), 40.0) // spacing_m)
-    candidates: list[tuple[float, float]] = [(0.0, 0.0)]
+    center_x, center_y = center_m
+    available_x = limit_x - abs(center_x)
+    available_y = limit_y - abs(center_y)
+    if available_x < 0.0 or available_y < 0.0:
+        return []
+    max_ring = int(min(max(available_x, available_y), max_radius_m) // spacing_m)
+    candidates: list[tuple[float, float]] = [(center_x, center_y)]
     for ring in range(1, max_ring + 1):
         radius = ring * spacing_m
         ring_points: list[tuple[float, float]] = [
@@ -245,7 +296,9 @@ def _candidate_spawn_centers(
                     (-value, -other),
                 )
             )
-        for x_m, y_m in ring_points:
+        for x_offset_m, y_offset_m in ring_points:
+            x_m = center_x + x_offset_m
+            y_m = center_y + y_offset_m
             if abs(x_m) <= limit_x and abs(y_m) <= limit_y:
                 candidates.append((x_m, y_m))
     return candidates
@@ -267,6 +320,51 @@ def _clearance_probe_points(x_m: float, y_m: float) -> list[tuple[float, float]]
     return [(x_m + dx, y_m + dy) for dx, dy in offsets]
 
 
+def _grid_spawn_offsets(
+    drone_count: int, spawn_spacing_m: float
+) -> list[tuple[float, float]]:
+    if drone_count < 1:
+        return []
+    # A zero user spacing means the most compact physical layout, not that all
+    # bodies occupy the same coordinates.
+    spacing_m = max(spawn_spacing_m, SPAWN_CLEARANCE_RADIUS_M)
+    columns = math.ceil(math.sqrt(drone_count))
+    rows = math.ceil(drone_count / columns)
+    width_m = (columns - 1) * spacing_m
+    depth_m = (rows - 1) * spacing_m
+    offsets: list[tuple[float, float]] = []
+    for row in range(rows):
+        for column in range(columns):
+            if len(offsets) == drone_count:
+                return offsets
+            offsets.append(
+                (
+                    column * spacing_m - width_m / 2.0,
+                    row * spacing_m - depth_m / 2.0,
+                )
+            )
+    return offsets
+
+
+def _area_sample_coordinates(
+    placements: list[tuple[float, float]],
+) -> list[tuple[float, float]]:
+    min_x = min(x for x, _ in placements) - SPAWN_AREA_MARGIN_M
+    max_x = max(x for x, _ in placements) + SPAWN_AREA_MARGIN_M
+    min_y = min(y for _, y in placements) - SPAWN_AREA_MARGIN_M
+    max_y = max(y for _, y in placements) + SPAWN_AREA_MARGIN_M
+    columns = math.ceil((max_x - min_x) / SPAWN_AREA_SAMPLE_STEP_M)
+    rows = math.ceil((max_y - min_y) / SPAWN_AREA_SAMPLE_STEP_M)
+    return [
+        (
+            min_x + column * (max_x - min_x) / max(columns, 1),
+            min_y + row * (max_y - min_y) / max(rows, 1),
+        )
+        for row in range(rows + 1)
+        for column in range(columns + 1)
+    ]
+
+
 def _select_safe_spawn_points(
     *,
     drone_count: int,
@@ -274,42 +372,118 @@ def _select_safe_spawn_points(
     terrain_height: Any,
     city_height: Any,
     spawn_spacing_m: float = SPAWN_DEFAULT_SEPARATION_M,
+    center_m: tuple[float, float] = (0.0, 0.0),
+    search_nearby: bool = True,
+    search_radius_m: float = SPAWN_AREA_SEARCH_RADIUS_M,
 ) -> list[dict[str, float]]:
     spawn_spacing_m = _validate_spawn_spacing(spawn_spacing_m)
-    selected: list[dict[str, float]] = []
-    for x_m, y_m in _candidate_spawn_centers(
-        half_extent_m, spacing_m=spawn_spacing_m
-    ):
-        probes = _clearance_probe_points(x_m, y_m)
-        terrain = [float(terrain_height(x, y)) for x, y in probes]
-        city = [float(city_height(x, y)) for x, y in probes]
+    offsets = _grid_spawn_offsets(drone_count, spawn_spacing_m)
+    north_south = float(half_extent_m.get("north_south", 0.0))
+    east_west = float(half_extent_m.get("east_west", 0.0))
+    if search_nearby:
+        area_centers = _candidate_spawn_centers(
+            half_extent_m,
+            spacing_m=SPAWN_AREA_SEARCH_STEP_M,
+            center_m=center_m,
+            max_radius_m=search_radius_m,
+        )
+    else:
+        area_centers = [center_m]
+
+    for area_center_x, area_center_y in area_centers:
+        if math.hypot(
+            area_center_x - center_m[0], area_center_y - center_m[1]
+        ) > search_radius_m:
+            continue
+        placements = [
+            (area_center_x + dx, area_center_y + dy) for dx, dy in offsets
+        ]
+        samples = _area_sample_coordinates(placements)
+        if any(
+            abs(x_m) > north_south or abs(y_m) > east_west
+            for x_m, y_m in samples
+        ):
+            continue
+        terrain = [float(terrain_height(x, y)) for x, y in samples]
+        city = [float(city_height(x, y)) for x, y in samples]
         if any(
             city_z - terrain_z > SURFACE_MATCH_TOLERANCE_M
             for terrain_z, city_z in zip(terrain, city)
         ):
             continue
-        if max(terrain) - min(terrain) > MAX_SPAWN_SLOPE_DELTA_M:
+        if max(terrain) - min(terrain) > SPAWN_AREA_MAX_HEIGHT_DELTA_M:
             continue
-        if any(
-            math.hypot(x_m - item["x_m"], y_m - item["y_m"])
-            < spawn_spacing_m
-            for item in selected
-        ):
-            continue
+
+        selected: list[dict[str, float]] = []
+        area_is_safe = True
+        for x_m, y_m in placements:
+            probes = _clearance_probe_points(x_m, y_m)
+            local_terrain = [float(terrain_height(x, y)) for x, y in probes]
+            local_city = [float(city_height(x, y)) for x, y in probes]
+            if (
+                max(local_terrain) - min(local_terrain)
+                > MAX_SPAWN_SLOPE_DELTA_M
+                or any(
+                    city_z - terrain_z > SURFACE_MATCH_TOLERANCE_M
+                    for terrain_z, city_z in zip(local_terrain, local_city)
+                )
+            ):
+                area_is_safe = False
+                break
+            selected.append(
+                {
+                    "x_m": x_m,
+                    "y_m": y_m,
+                    "terrain_height_m": local_terrain[0],
+                    "surface_height_m": max(local_city),
+                }
+            )
+        if area_is_safe:
+            return selected
+
+    raise FleetMujocoError(
+        f"could not fit a level launch grid for {drone_count} drones near "
+        f"({center_m[0]:.3f}, {center_m[1]:.3f}) with "
+        f"{SPAWN_AREA_MARGIN_M:g} m safety margins; use manual "
+        "launch_area.offset_m to select a more open area"
+    )
+
+
+def _manual_spawn_points(
+    *,
+    drone_count: int,
+    half_extent_m: dict[str, Any],
+    terrain_height: Any,
+    city_height: Any,
+    spawn_spacing_m: float,
+    center_m: tuple[float, float],
+) -> list[dict[str, float]]:
+    offsets = _grid_spawn_offsets(
+        drone_count, _validate_spawn_spacing(spawn_spacing_m)
+    )
+    placements = [(center_m[0] + dx, center_m[1] + dy) for dx, dy in offsets]
+    north_south = float(half_extent_m.get("north_south", 0.0))
+    east_west = float(half_extent_m.get("east_west", 0.0))
+    if any(
+        abs(x_m) > north_south or abs(y_m) > east_west
+        for x_m, y_m in placements
+    ):
+        raise FleetMujocoError(
+            "manual launch grid extends beyond the City World bounds"
+        )
+    selected: list[dict[str, float]] = []
+    for x_m, y_m in placements:
+        terrain_z = float(terrain_height(x_m, y_m))
+        city_z = float(city_height(x_m, y_m))
         selected.append(
             {
                 "x_m": x_m,
                 "y_m": y_m,
-                "terrain_height_m": terrain[0],
-                "surface_height_m": city[0],
+                "terrain_height_m": terrain_z,
+                "surface_height_m": max(terrain_z, city_z),
             }
         )
-        if len(selected) == drone_count:
-            return selected
-    raise FleetMujocoError(
-        f"could not find {drone_count} safe launch points within 40 m of the "
-        "City World center; reduce drone_count or select a more open area"
-    )
+    return selected
 
 
 def _formation_targets(
@@ -649,6 +823,15 @@ def _path_points(
     ]
 
 
+def _formation_clearance_points(
+    targets: list[tuple[float, float]],
+) -> set[tuple[float, float]]:
+    points: set[tuple[float, float]] = set()
+    for x_m, y_m in targets:
+        points.update(_clearance_probe_points(x_m, y_m))
+    return points
+
+
 def _load_generator(drone_root: Path):
     script = drone_root / "tools" / "gen_mujoco_multidrone_xml.py"
     if not script.is_file():
@@ -978,6 +1161,7 @@ def materialize_fleet_config(
     above_city_clearance_m: float = 10.0,
     formation_rotation_deg: float = 90.0,
     formation_tilt_deg: float = 15.0,
+    launch_area: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Replace a configured non-ICRA fleet with its MuJoCo equivalent."""
     if not math.isfinite(formation_rotation_deg):
@@ -990,6 +1174,9 @@ def materialize_fleet_config(
             "must be between 0.18 and 2.0"
         )
     spawn_spacing_m = _validate_spawn_spacing(spawn_spacing_m)
+    launch_mode, launch_offset_m, launch_search_radius_m = _resolve_launch_area(
+        launch_area
+    )
     if altitude_mode not in ALTITUDE_MODES:
         raise FleetMujocoError(
             f"altitude_mode must be one of {sorted(ALTITUDE_MODES)}"
@@ -1026,6 +1213,7 @@ def materialize_fleet_config(
     type_config = json.loads(type_source.read_text(encoding="utf-8"))
     type_config["name"] = "api-mujoco-city"
     dynamics = type_config["components"]["droneDynamics"]
+    dynamics["enable_disturbance"] = True
     dynamics["mujoco"]["modelPath"] = str(model_path)
     origin = city.get("origin")
     if not isinstance(origin, dict):
@@ -1108,23 +1296,33 @@ def materialize_fleet_config(
     with _MujocoRayScene(terrain_xml, library_path) as terrain_scene, _MujocoRayScene(
         city_xml, library_path
     ) as city_scene:
-        spawn_points = _select_safe_spawn_points(
-            drone_count=drone_count,
-            half_extent_m=half_extent,
-            terrain_height=terrain_scene.height,
-            city_height=city_scene.height,
-            spawn_spacing_m=spawn_spacing_m,
-        )
+        spawn_args = {
+            "drone_count": drone_count,
+            "half_extent_m": half_extent,
+            "terrain_height": terrain_scene.height,
+            "city_height": city_scene.height,
+            "spawn_spacing_m": spawn_spacing_m,
+            "center_m": (launch_offset_m[0], launch_offset_m[1]),
+        }
+        if launch_mode == "manual":
+            spawn_points = _manual_spawn_points(**spawn_args)
+        else:
+            spawn_points = _select_safe_spawn_points(
+                **spawn_args,
+                search_nearby=True,
+                search_radius_m=launch_search_radius_m,
+            )
         targets = _formation_targets(show, show_path=show_path)
         if not targets:
             targets = [(item["x_m"], item["y_m"]) for item in spawn_points]
-        route_points: set[tuple[float, float]] = set(targets)
-        for spawn in spawn_points:
-            start = (spawn["x_m"], spawn["y_m"])
-            for target in targets:
-                route_points.update(_path_points(start, target))
+        route_points = _formation_clearance_points(targets)
+        print(
+            "[mujoco-city] checking launch and formation clearance: "
+            f"{len(route_points)} unique samples"
+        )
         route_surface_height_m = max(
-            city_scene.height(x_m, y_m) for x_m, y_m in route_points
+            max(point["surface_height_m"] for point in spawn_points),
+            max(city_scene.height(x_m, y_m) for x_m, y_m in route_points),
         )
 
     city_visual_max_height_m: float | None = None
@@ -1147,7 +1345,9 @@ def materialize_fleet_config(
     if not isinstance(drones, list) or len(drones) != drone_count:
         raise FleetMujocoError("generated fleet drone count changed unexpectedly")
     for drone, spawn in zip(drones, spawn_points):
-        local_z_m = spawn["terrain_height_m"] + spawn_altitude_m
+        local_z_m = (
+            spawn["surface_height_m"] + spawn_altitude_m + launch_offset_m[2]
+        )
         drone["position_meter"] = [spawn["x_m"], spawn["y_m"], -local_z_m]
         spawn["body_origin_height_m"] = local_z_m
     fleet.write_text(json.dumps(fleet_config, indent=2) + "\n", encoding="utf-8")
@@ -1228,7 +1428,7 @@ def materialize_fleet_config(
         "altitude_contract": (
             "clearance above highest visual building in the generated city"
             if altitude_mode == "city-max-clearance"
-            else "requested AGL above highest collider on planned routes"
+            else "requested AGL above launch and formation areas"
         ),
         "requested_agl_m": requested_agl_m,
         "requested_clearance_m": requested_clearance_m,
@@ -1240,8 +1440,30 @@ def materialize_fleet_config(
         "altitude_reference_height_m": altitude_reference_m,
         "resolved_flight_altitude_m": flight_altitude_m,
         "spawn_body_clearance_m": spawn_altitude_m,
+        "launch_area": {
+            "mode": launch_mode,
+            "validation": (
+                "trusted-manual" if launch_mode == "manual" else "level-grid"
+            ),
+            "requested_offset_m": list(launch_offset_m),
+            "search_center_m": [launch_offset_m[0], launch_offset_m[1]],
+            "search_radius_m": launch_search_radius_m,
+            "resolved_center_m": [
+                sum(point["x_m"] for point in spawn_points) / len(spawn_points),
+                sum(point["y_m"] for point in spawn_points) / len(spawn_points),
+                sum(point["body_origin_height_m"] for point in spawn_points)
+                / len(spawn_points),
+            ],
+        },
         "spawn_clearance_radius_m": SPAWN_CLEARANCE_RADIUS_M,
+        "spawn_maximum_footprint_height_delta_m": MAX_SPAWN_SLOPE_DELTA_M,
+        "spawn_area_safety_margin_m": SPAWN_AREA_MARGIN_M,
+        "spawn_area_maximum_height_delta_m": SPAWN_AREA_MAX_HEIGHT_DELTA_M,
+        "spawn_layout": "rectangular-grid",
         "spawn_minimum_separation_m": spawn_spacing_m,
+        "spawn_resolved_separation_m": max(
+            spawn_spacing_m, SPAWN_CLEARANCE_RADIUS_M
+        ),
         "spawn_points": spawn_points,
         "formation_targets": [list(point) for point in targets],
         "formation_rotation_deg_clockwise": formation_rotation_deg,
@@ -1295,6 +1517,7 @@ def configure_single_host_fleet(
     process_count: int = 1,
     formation_rotation_deg: float = 90.0,
     formation_tilt_deg: float = 15.0,
+    launch_area: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     spawn_spacing_m = _validate_spawn_spacing(spawn_spacing_m)
     if process_count < 1 or process_count > drone_count:
@@ -1316,6 +1539,7 @@ def configure_single_host_fleet(
         above_city_clearance_m=above_city_clearance_m,
         formation_rotation_deg=formation_rotation_deg,
         formation_tilt_deg=formation_tilt_deg,
+        launch_area=launch_area,
     )
 
 
@@ -1329,6 +1553,7 @@ def materialize_flat_fleet_config(
     flight_altitude_agl_m: float,
     formation_rotation_deg: float,
     formation_tilt_deg: float,
+    launch_area: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Replace the generic fleet with a shared flat-ground MuJoCo fleet."""
     if not 0.18 <= spawn_altitude_m <= 2.0:
@@ -1336,6 +1561,9 @@ def materialize_flat_fleet_config(
             "spawn_altitude_m must be between 0.18 and 2.0"
         )
     spawn_spacing_m = _validate_spawn_spacing(spawn_spacing_m)
+    launch_mode, launch_offset_m, launch_search_radius_m = _resolve_launch_area(
+        launch_area
+    )
     if not math.isfinite(flight_altitude_agl_m) or flight_altitude_agl_m < 0.5:
         raise FleetMujocoError("flat flight altitude must be at least 0.5 m AGL")
     if not math.isfinite(formation_rotation_deg):
@@ -1374,7 +1602,9 @@ def materialize_flat_fleet_config(
     type_output.parent.mkdir(parents=True, exist_ok=True)
     type_config = json.loads(source_type.read_text(encoding="utf-8"))
     type_config["name"] = "api-mujoco-flat"
-    type_config["components"]["droneDynamics"]["mujoco"]["modelPath"] = str(
+    dynamics = type_config["components"]["droneDynamics"]
+    dynamics["enable_disturbance"] = True
+    dynamics["mujoco"]["modelPath"] = str(
         model_path
     )
     location = type_config["simulation"]["location"]
@@ -1389,7 +1619,7 @@ def materialize_flat_fleet_config(
     service = recipe_config / "drone" / "fleets" / "services" / "api-current-service.json"
     pdudef = recipe_config / "pdudef" / "drone-pdudef-current.json"
     generator = drone_root / "tools" / "gen_fleet_scale_config.py"
-    body_origin_height_m = ground_height_m + spawn_altitude_m
+    body_origin_height_m = ground_height_m + spawn_altitude_m + launch_offset_m[2]
     command = [
         sys.executable,
         str(generator),
@@ -1419,6 +1649,7 @@ def materialize_flat_fleet_config(
     candidates = _candidate_spawn_centers(
         {"north_south": 40.0, "east_west": 40.0},
         spacing_m=spawn_spacing_m,
+        center_m=(launch_offset_m[0], launch_offset_m[1]),
     )
     if len(candidates) < drone_count:
         raise FleetMujocoError("flat ground cannot allocate all launch points")
@@ -1501,6 +1732,17 @@ def materialize_flat_fleet_config(
         "altitude_reference_height_m": ground_height_m,
         "resolved_flight_altitude_m": flight_altitude_m,
         "spawn_body_clearance_m": spawn_altitude_m,
+        "launch_area": {
+            "mode": launch_mode,
+            "requested_offset_m": list(launch_offset_m),
+            "search_center_m": [launch_offset_m[0], launch_offset_m[1]],
+            "search_radius_m": launch_search_radius_m,
+            "resolved_center_m": [
+                sum(point["x_m"] for point in spawn_points) / len(spawn_points),
+                sum(point["y_m"] for point in spawn_points) / len(spawn_points),
+                body_origin_height_m,
+            ],
+        },
         "spawn_minimum_separation_m": spawn_spacing_m,
         "spawn_points": spawn_points,
         "formation_targets": [],
@@ -1547,6 +1789,7 @@ def configure_single_host_flat_fleet(
     process_count: int = 1,
     formation_rotation_deg: float = 90.0,
     formation_tilt_deg: float = 15.0,
+    launch_area: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     model = build_flat_process_models(
         drone_root=drone_root,
@@ -1565,6 +1808,7 @@ def configure_single_host_flat_fleet(
         flight_altitude_agl_m=flight_altitude_agl_m,
         formation_rotation_deg=formation_rotation_deg,
         formation_tilt_deg=formation_tilt_deg,
+        launch_area=launch_area,
     )
 
 

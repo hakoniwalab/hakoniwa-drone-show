@@ -44,7 +44,11 @@ class ShowRuntimeTest(unittest.TestCase):
                 1,
             )
             types = json.loads((root / show_runtime.SHOW_PDUTYPES_FILE).read_text())
-            self.assertEqual([entry["pdu_size"] for entry in types], [1024, 1024])
+            self.assertEqual([entry["pdu_size"] for entry in types], [1024, 1024, 1024])
+            self.assertEqual(
+                [entry["channel_id"] for entry in types],
+                [0, 1, 2],
+            )
 
     def test_bridge_adds_bidirectional_show_routes(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -81,9 +85,14 @@ class ShowRuntimeTest(unittest.TestCase):
             bridge = json.loads((output / "bridge" / "bridge.json").read_text())
             self.assertIn("drone_show_command", bridge["pduKeyGroups"])
             self.assertIn("drone_show_status", bridge["pduKeyGroups"])
+            self.assertIn("global_wind_command", bridge["pduKeyGroups"])
             self.assertEqual(
                 {entry["id"] for entry in bridge["connections"]},
-                {"conn_drone_show_command_ws_to_shm", "conn_drone_show_status_shm_to_ws"},
+                {
+                    "conn_drone_show_command_ws_to_shm",
+                    "conn_drone_show_status_shm_to_ws",
+                    "conn_global_wind_command_ws_to_shm",
+                },
             )
             container = json.loads((output / "endpoint" / "endpoint_container.json").read_text())
             self.assertEqual(
@@ -93,6 +102,7 @@ class ShowRuntimeTest(unittest.TestCase):
             shm = json.loads((output / "comm" / "visual-state-shm-callback.json").read_text())
             show = next(item for item in shm["io"]["robots"] if item["name"] == protocol.ROBOT_NAME)
             self.assertEqual(show["pdu"][1]["notify_on_recv"], True)
+            self.assertEqual(show["pdu"][2], {"name": "global_wind_command", "notify_on_recv": False})
 
     def test_launcher_is_patched_without_changing_other_assets(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -143,6 +153,68 @@ class ShowRuntimeTest(unittest.TestCase):
             )
             self.assertEqual(assets["web-bridge-fleets"]["args"][1], str((root / "bridge").resolve()))
             self.assertEqual(assets["visual-state-publisher"]["args"], ["vsp.json"])
+
+    def test_launcher_adds_global_wind_asset(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            launcher_path = root / "launcher.json"
+            write_json(
+                launcher_path,
+                {"assets": [
+                    {
+                        "name": "show-runner",
+                        "command": "python3",
+                        "args": ["old.py"],
+                        "env": {"set": {}},
+                        "depends_on": ["web-bridge-fleets"],
+                    },
+                    {"name": "web-bridge-fleets", "args": ["--config-root", "old"]},
+                ]},
+            )
+            runner = root / "runner.py"
+            wind_asset_path = root / "global_wind_asset.py"
+            endpoint = root / "endpoint.json"
+            pdu_config = root / "pdudef.json"
+            for path in (runner, wind_asset_path, endpoint, pdu_config):
+                path.touch()
+            show_runtime.patch_launcher(
+                launcher_path,
+                show_runner=runner,
+                drone_root=root / "drone",
+                bridge_config_root=root / "bridge",
+                global_wind_asset=wind_asset_path,
+                global_wind_endpoint_config=endpoint,
+                pdu_config_path=pdu_config,
+            )
+            assets = {
+                asset["name"]: asset
+                for asset in json.loads(launcher_path.read_text())["assets"]
+            }
+            wind = assets["global-wind-asset"]
+            self.assertEqual(wind["activation_timing"], "before_start")
+            self.assertEqual(wind["depends_on"], ["web-bridge-fleets"])
+            self.assertIn(str(endpoint.resolve()), wind["args"])
+            self.assertIn(str(pdu_config.resolve()), wind["args"])
+            self.assertEqual(assets["show-runner"]["depends_on"], ["global-wind-asset"])
+
+    def test_global_wind_asset_config_uses_shm_callback(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            pdu_config = root / "pdudef.json"
+            pdu_config.touch()
+            endpoint = show_runtime.materialize_global_wind_asset_config(
+                root / "wind", pdu_def_path=pdu_config
+            )
+            value = json.loads(endpoint.read_text())
+            self.assertEqual(value["pdu_def_path"], str(pdu_config.resolve()))
+            comm = json.loads((endpoint.parent / value["comm"]).read_text())
+            self.assertEqual(comm["protocol"], "shm")
+            self.assertEqual(comm["impl_type"], "callback")
+            self.assertEqual(comm["direction"], "in")
+            self.assertEqual(
+                comm["io"]["robots"][0]["pdu"],
+                [{"name": "global_wind_command", "notify_on_recv": True}],
+            )
 
     def test_launcher_adds_ar_https_and_wss_gateway(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

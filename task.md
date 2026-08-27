@@ -45,6 +45,24 @@ Launcherでruntimeを起動
 - ICRA Recipe、ICRA測定用Runner、Drone PROの既存Show Runnerを変更しない
 - Show開始待機とフェーズ通知は本リポジトリのShow Experience Runnerで追加する
 
+## PLATEAU AWARD向けスコープ（2026-08-27）
+
+PLATEAU AWARD向けデモではカメラ重畳ARを対象外とし、PLATEAU City版へ注力する。
+ARは技術検証済みの将来機能として[`task-ar.md`](task-ar.md)で継続管理する。
+
+次の優先テーマは、PLATEAUの実在都市空間で風および突風を与え、編隊飛行中の位置ずれや
+姿勢変化を箱庭/MuJoCoの物理挙動として可視化することである。例えば大阪城を会場に選んだ
+場合に、通常風と突風でショーの成立性がどう変わるかを比較できるデモを目指す。
+
+- PLATEAU: 実在する建物、地形、会場条件を提供する
+- 箱庭/MuJoCo: 同じショー計画に対する物理応答を再現する
+- 風環境: 通常時、定常風、突風を再現可能な条件として切り替える
+- Viewer: 計画軌道と実際の機体挙動の差を観察できるようにする
+
+位置依存の汎用風環境は`hakoniwa-envsim`をOwnerとする。全機へ同じ風を変更時だけ配る
+ショー専用Global Wind Assetは本リポジトリで管理し、詳細は[`task-wnd.md`](task-wnd.md)に
+記録する。風速や突風条件を安全性の保証値とは扱わず、PoCとして条件間の差を示す。
+
 ## 完了の定義
 
 - ブラウザ表示時に自動接続し、ショー開始前の全機を確認できる
@@ -421,7 +439,8 @@ Task 4ではLED状態をPDUへ追加せず、現在phaseだけを通知する。
 | Show StatusのPDU型 | 既存`std_msgs/String`を再利用 |
 | LED Sprite、色・明るさ描画 | `hakoniwa-threejs-drone` |
 | 自動接続、開始ボタン、状態表示 | `hakoniwa-map-viewer` |
-| City World、地形、風、環境作用 | `hakoniwa-envsim`（変更なし） |
+| City World、地形、位置依存の風・環境作用 | `hakoniwa-envsim`（変更なし） |
+| ショー全機へ一様風を変更時だけ配るGlobal Wind Asset | `hakoniwa-drone-show` |
 
 具体的な変更先は各Taskの調査で確定する。Business Packへowner repositoryの
 実装を複製せず、Recipe側には設定生成と統合だけを置く。

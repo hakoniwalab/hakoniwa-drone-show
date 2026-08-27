@@ -128,7 +128,7 @@ environment:
 `flat`では次の軽量構成を生成します。
 
 - 指定高度の平面床
-- 床から既定0.20m上に配置したDrone
+- 床から既定0.50m上に配置したDrone
 - City mesh、都市collider、City World Receiptを含まないMuJoCo model
 - 都市GLBを含まないThree.js scene
 

@@ -66,21 +66,21 @@ viewer:
         spread_deg: 35.0
         color: "#ffd6a0"
   crowd:
-    enabled: false
+    enabled: true
     count: 240
     center_m: [0.0, -34.0]
     width_m: 44.0
     depth_m: 16.0
-    ground_height_m: 5.5
+    ground_height_m: 33.26
     lighting:
       enabled: true
       intensity: 140.0
       height_m: 4.0
   audience_camera:
-    position_m: [4.93, -68.05, 9.50]
-    yaw_deg: 111.22
-    pitch_deg: 12.59
-    fov_deg: 76.43
+    position_m: [11.66, -44.91, 33.76]
+    yaw_deg: 105.56
+    pitch_deg: 12.08
+    fov_deg: 67.02
 
 ar:
   enabled: false
@@ -99,6 +99,9 @@ ar:
 
 scenario:
   show_file: ../../shows/kids-space-adventure.show.json
+  launch_area:
+    mode: manual
+    offset_m: [-50.0, 0.0, 0.0]
   formation:
     scale_m: 20
     depth_m: 10.0

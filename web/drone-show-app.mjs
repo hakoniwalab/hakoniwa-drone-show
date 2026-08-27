@@ -4,6 +4,9 @@ import { ledStatesForFrame, rgbCss, validateShowIrForViewer } from './show-led-t
 import { bytesToHex, sha256Bytes } from './sha256.mjs';
 import { createAudienceCrowd } from './audience-crowd.mjs';
 import { cityLightingYaml, createCityLighting, normalizeCityLighting } from './city-lighting.mjs';
+import { GlobalWindClient } from './global-wind-client.mjs';
+import { flowDirectionToRos, normalizeDirectionFromDeg } from './global-wind-protocol.mjs';
+import { cameraHeadingDisplay } from './camera-heading.mjs';
 
 const ui = {
   state: document.getElementById('show-state'),
@@ -24,6 +27,10 @@ const ui = {
   cameraFov: document.getElementById('camera-fov'),
   cameraCopy: document.getElementById('camera-copy'),
   cameraCopyStatus: document.getElementById('camera-copy-status'),
+  cameraHeadingHud: document.getElementById('camera-heading-hud'),
+  cameraHeadingPointer: document.getElementById('camera-heading-pointer'),
+  cameraHeadingCardinal: document.getElementById('camera-heading-cardinal'),
+  cameraHeadingDegrees: document.getElementById('camera-heading-degrees'),
   cityLightingPanel: document.getElementById('city-lighting-panel'),
   lightingCityBrightness: document.getElementById('lighting-city-brightness'),
   lightingCityValue: document.getElementById('lighting-city-value'),
@@ -40,10 +47,20 @@ const ui = {
   lightingEditTarget: document.getElementById('lighting-edit-target'),
   lightingCopy: document.getElementById('lighting-copy'),
   lightingCopyStatus: document.getElementById('lighting-copy-status'),
+  windPanel: document.getElementById('global-wind-panel'),
+  windEnabled: document.getElementById('wind-enabled'),
+  windCompass: document.getElementById('wind-compass'),
+  windPointer: document.getElementById('wind-pointer'),
+  windDirection: document.getElementById('wind-direction'),
+  windSpeed: document.getElementById('wind-speed'),
+  windSpeedValue: document.getElementById('wind-speed-value'),
+  windVector: document.getElementById('wind-vector'),
+  windStatus: document.getElementById('wind-status'),
 };
 
 let viewer = null;
 let controlClient = null;
+let globalWindClient = null;
 let latestStatus = null;
 let expectedDroneCount = 0;
 let visibleDroneCount = 0;
@@ -65,6 +82,56 @@ let cityLightingEditMode = 'target';
 let audienceCameraEnabled = false;
 let cameraMovementEnabled = false;
 const cameraMovementPointers = new Map();
+let windCompassPointerId = null;
+
+function currentManualWind() {
+  return {
+    enabled: ui.windEnabled.checked,
+    directionToDeg: normalizeDirectionFromDeg(ui.windDirection.value),
+    speedMps: Number(ui.windSpeed.value),
+  };
+}
+
+function refreshManualWindDisplay() {
+  const wind = currentManualWind();
+  ui.windDirection.value = wind.directionToDeg.toFixed(0);
+  ui.windSpeedValue.textContent = `${wind.speedMps.toFixed(1)} m/s`;
+  ui.windPointer.style.transform = `translate(-50%, -100%) rotate(${wind.directionToDeg}deg)`;
+  const vector = wind.enabled
+    ? flowDirectionToRos(wind.directionToDeg, wind.speedMps)
+    : [0, 0, 0];
+  ui.windVector.textContent = `[${vector.map((value) => value.toFixed(2)).join(', ')}] ROS m/s`;
+}
+
+async function sendManualWind() {
+  refreshManualWindDisplay();
+  if (!globalWindClient) {
+    ui.windStatus.textContent = '通信準備中';
+    return;
+  }
+  try {
+    const result = await globalWindClient.sendManual(currentManualWind());
+    ui.windStatus.textContent = result.sent
+      ? `送信済み #${result.command.sequence}`
+      : '変更なし（未送信）';
+    ui.windStatus.dataset.failed = 'false';
+  } catch (error) {
+    ui.windStatus.textContent = `送信失敗: ${error.message}`;
+    ui.windStatus.dataset.failed = 'true';
+  }
+}
+
+function windHeadingFromPointer(event) {
+  const rect = ui.windCompass.getBoundingClientRect();
+  const east = event.clientX - (rect.left + rect.width / 2);
+  const north = (rect.top + rect.height / 2) - event.clientY;
+  return normalizeDirectionFromDeg(Math.atan2(east, north) * 180 / Math.PI);
+}
+
+function updateWindHeadingFromPointer(event) {
+  ui.windDirection.value = windHeadingFromPointer(event).toFixed(0);
+  refreshManualWindDisplay();
+}
 
 function setCityLightingInputs(state) {
   const selectedIndex = Number(ui.lightingSelect.value) || 0;
@@ -178,6 +245,16 @@ function refreshAudienceCameraState() {
   const state = viewer?.getAudienceCameraState?.();
   const visible = state?.enabled === true;
   ui.cameraState.hidden = !visible;
+  const headingState = visible ? state : viewer?.getCameraHeadingState?.();
+  if (headingState && Number.isFinite(Number(headingState.yawDeg))) {
+    const heading = cameraHeadingDisplay(headingState.yawDeg);
+    ui.cameraHeadingHud.hidden = false;
+    ui.cameraHeadingPointer.style.transform = `translate(-50%, -100%) rotate(${heading.headingDeg}deg)`;
+    ui.cameraHeadingCardinal.textContent = heading.cardinal;
+    ui.cameraHeadingDegrees.textContent = `${heading.headingText}°`;
+  } else {
+    ui.cameraHeadingHud.hidden = true;
+  }
   if (!visible) return null;
   const display = displayAudienceCameraState(state);
   ui.cameraX.textContent = display.x;
@@ -431,6 +508,9 @@ async function initialize() {
   if (!manager) throw new Error('Viewer PDU session is unavailable');
   controlClient = new ShowControlClient(manager, runtime, onShowStatus);
   await controlClient.start();
+  globalWindClient = new GlobalWindClient(manager, runtime.global_wind);
+  await globalWindClient.start();
+  ui.windStatus.textContent = '操作待ち';
   setUiState('initializing', 'Show Runnerの準備を待っています');
 
   const originLat = Number(runtime.origin.latitude);
@@ -597,6 +677,34 @@ ui.lightingCopy.addEventListener('click', async () => {
     showLightingCopyStatus(`コピー失敗: ${error.message}`, true);
   }
 });
+
+ui.windEnabled.addEventListener('change', sendManualWind);
+ui.windDirection.addEventListener('input', refreshManualWindDisplay);
+ui.windDirection.addEventListener('change', sendManualWind);
+ui.windSpeed.addEventListener('input', refreshManualWindDisplay);
+ui.windSpeed.addEventListener('change', sendManualWind);
+ui.windCompass.addEventListener('pointerdown', (event) => {
+  event.preventDefault();
+  windCompassPointerId = event.pointerId;
+  ui.windCompass.setPointerCapture?.(event.pointerId);
+  updateWindHeadingFromPointer(event);
+});
+ui.windCompass.addEventListener('pointermove', (event) => {
+  if (event.pointerId !== windCompassPointerId) return;
+  updateWindHeadingFromPointer(event);
+});
+const finishWindCompass = async (event) => {
+  if (event.pointerId !== windCompassPointerId) return;
+  updateWindHeadingFromPointer(event);
+  windCompassPointerId = null;
+  ui.windCompass.releasePointerCapture?.(event.pointerId);
+  await sendManualWind();
+};
+ui.windCompass.addEventListener('pointerup', finishWindCompass);
+ui.windCompass.addEventListener('pointercancel', (event) => {
+  if (event.pointerId === windCompassPointerId) windCompassPointerId = null;
+});
+refreshManualWindDisplay();
 
 window.addEventListener('beforeunload', () => {
   clearCameraMovementInput();

@@ -64,6 +64,49 @@ ENU各軸のaxis-aligned bounding boxは、回転によってこの値より小�
 | `scale.drone_count` | 1以上の整数 | ショー全体の機体数です。Formationもこの機体数へ再サンプリングされます。現在の一般ユーザー向け上限は128機です。`configure --drone-count`で一時上書きできます。 |
 | `scale.process_count` | 1以上かつ機体数以下の整数 | Drone Serviceのプロセス数です。機体は全プロセスへ均等に自動分割されます。`drones_per_process`は指定しません。`configure --process-count`で一時上書きできます。 |
 
+### `scenario.launch_area`
+
+`scenario.launch_area`は、ショーのFormation位置を変えずに、離陸時の初期配置だけを
+別の場所へ移す設定です。座標はDrone PDUと同じROSローカル座標系で、ショー中心を
+原点とするメートル値です。
+
+```yaml
+scenario:
+  launch_area:
+    mode: auto
+    search_radius_m: 80.0
+```
+
+`auto`は機体を碁盤状に収める矩形領域を作り、ショー中心から`search_radius_m`以内で
+領域全体が
+平坦な場所を探索します。領域は前後左右に3mの安全余白を持ち、1m間隔で地面と建物を
+検査します。領域全体の標高差は5cm以内、各機の接地範囲内は5mm以内でなければ採用
+しません。これはCity Worldデータを用いるベストエフォート探索です。必要な大きさの
+単一領域を確保できない場合、`configure`はエラーで終了します。
+
+離陸場所を明示したい場合は`manual`を使います。
+
+```yaml
+scenario:
+  launch_area:
+    mode: manual
+    offset_m: [20.0, -30.0, 0.0]
+```
+
+`offset_m`は`[x, y, z]`です。`x`と`y`は飛行場所（ショー中心）から離陸領域の
+中心までの相対距離です。`z`は、その場所で検出した地表面から追加する高さで、
+通常の地上離陸は`0.0`にします。`manual`では指定位置を信頼して碁盤配置をそのまま置き、
+平坦性や建物との重なりによるconfigureエラーにはしません。各機の初期高度だけは指定地点の
+地表またはコライダー上面から解決します。City World範囲外の場合のみエラーになります。
+Formation、Show IR、
+観客カメラ、照明の座標はこの設定では移動しません。
+
+| 項目 | 型・制約 | 説明 |
+|---|---|---|
+| `scenario.launch_area.mode` | `auto`または`manual` | 初期配置場所の決定方式です。 |
+| `scenario.launch_area.search_radius_m` | `auto`時のみ、0〜500 | ショー中心から平坦領域を探索する最大半径（m）です。小さいほどconfigureは速く、候補がなければエラーになります。 |
+| `scenario.launch_area.offset_m` | `manual`時のみ必須、3要素の有限数配列 | ショー中心からの相対`[x, y, z]`（m）です。`z`は0〜100mです。 |
+
 ### `runtime`
 
 | 項目 | 型・制約 | 説明 |
@@ -78,7 +121,7 @@ ENU各軸のaxis-aligned bounding boxは、回転によってこの値より小�
 |---|---|---|
 | `environment.mode` | `plateau`または`flat` | `plateau`はCity World Receiptの都市mesh・terrain・colliderをMuJoCoとViewerへ組み込みます。`flat`は都市データを一切使わず、Droneと平面床だけの軽量MuJoCo Worldを生成します。 |
 | `environment.plateau.city_world_receipt` | experimentからの相対パスまたは絶対パス | `plateau`で使用するBusiness PackのCity World Receiptです。相対パスはexperiment YAMLのディレクトリを基準に解決します。`--mujoco-city-world`はこの値を一時上書きします。 |
-| `environment.plateau.altitude_mode` | `route-clearance`または`city-max-clearance` | 飛行高度の解決方式です。`route-clearance`は計画経路上の最高コライダー、`city-max-clearance`はCity全体の最高コライダーを基準にします。`--altitude-mode`はこの値を一時上書きします。 |
+| `environment.plateau.altitude_mode` | `route-clearance`または`city-max-clearance` | 飛行高度の解決方式です。`route-clearance`は離陸領域とFormation各点の周辺にある最高コライダー、`city-max-clearance`はCity全体の最高コライダーを基準にします。`--altitude-mode`はこの値を一時上書きします。 |
 | `environment.flat.ground_height_m` | 有限数 | `flat`の床面を置くローカルZ（m）です。既存City版の離陸地点と高さを合わせる場合は、その地点の`terrain_height_m`を指定します。 |
 | `environment.flat.origin.latitude` | -90〜90 | Leaflet表示とDrone位置基準に使う緯度です。物理床の高さには影響しません。 |
 | `environment.flat.origin.longitude` | -180〜180 | Leaflet表示とDrone位置基準に使う経度です。 |
@@ -89,7 +132,7 @@ ENU各軸のaxis-aligned bounding boxは、回転によってこの値より小�
 別Cityや別の高度解決方式を一時的に試す場合だけCLIオプションを指定します。
 
 `flat`ではCity World Receiptを参照しません。床面は`ground_height_m`、機体中心の初期Zは
-`ground_height_m + --spawn-altitude-m`（既定0.20m）、Formationの最低飛行高度は
+`ground_height_m + --spawn-altitude-m`（既定0.50m）、Formationの最低飛行高度は
 `ground_height_m + scenario.altitude_m`として解決されます。既定設定は、直前の静岡City
 Worldにおける中央離陸地点の高さへ合わせています。
 
@@ -129,6 +172,10 @@ Worldにおける中央離陸地点の高さへ合わせています。
 押しながら移動すると高速になります。左ドラッグでyaw、右ドラッグでpitch、
 マウスホイールでFOVを調整します。調整内容はブラウザ内だけに保持され、YAMLは
 自動更新されません。観客視点のパネルには現在のENU位置、yaw、pitch、FOVが表示されます。
+3D画面右上の方位HUDには、観客視点・自由視点のどちらでも現在の視線方向を
+コンパス方位（0°=北、90°=東）で表示します。「風を操作」の流れる方向（to）と同じ方位基準なので、
+機体が画面上のどちらへ流れるかを確認できます。カメラ設定のyawはENU基準（0°=東、
+90°=北）のため、数値を比較するときは右上HUDを使用してください。
 `YAML設定をコピー`で`audience_camera`ブロックをコピーし、`viewer`の下へ反映してから
 `configure`を再実行してください。
 

@@ -449,6 +449,73 @@ def _show_definition(experiment_path: Path) -> tuple[Path, dict]:
     return path, definition
 
 
+def _launch_area_settings(experiment_path: Path) -> dict:
+    raw = _BASE_LOAD_SIMPLE_YAML(experiment_path)
+    scenario = raw.get("scenario")
+    if scenario is None:
+        scenario = {}
+    if not isinstance(scenario, dict):
+        raise base.RecipeError("scenario must be a mapping")
+    launch_area = scenario.get("launch_area", {"mode": "auto"})
+    if not isinstance(launch_area, dict):
+        raise base.RecipeError("scenario.launch_area must be a mapping")
+    unknown = sorted(
+        set(launch_area) - {"mode", "offset_m", "search_radius_m"}
+    )
+    if unknown:
+        raise base.RecipeError(
+            "scenario.launch_area has unknown fields: " + ", ".join(unknown)
+        )
+    mode = launch_area.get("mode", "auto")
+    if mode not in {"auto", "manual"}:
+        raise base.RecipeError("scenario.launch_area.mode must be auto or manual")
+    offset = launch_area.get("offset_m")
+    if mode == "auto":
+        if offset is not None:
+            raise base.RecipeError(
+                "scenario.launch_area.offset_m is only valid in manual mode"
+            )
+        search_radius = launch_area.get("search_radius_m", 100.0)
+        if (
+            not isinstance(search_radius, (int, float))
+            or isinstance(search_radius, bool)
+            or not math.isfinite(float(search_radius))
+            or not 0.0 <= float(search_radius) <= 500.0
+        ):
+            raise base.RecipeError(
+                "scenario.launch_area.search_radius_m must be in [0, 500]"
+            )
+        return {
+            "mode": "auto",
+            "offset_m": [0.0, 0.0, 0.0],
+            "search_radius_m": float(search_radius),
+        }
+    if "search_radius_m" in launch_area:
+        raise base.RecipeError(
+            "scenario.launch_area.search_radius_m is only valid in auto mode"
+        )
+    if not isinstance(offset, list) or len(offset) != 3:
+        raise base.RecipeError(
+            "scenario.launch_area.offset_m must contain [x, y, z] in manual mode"
+        )
+    values: list[float] = []
+    for index, value in enumerate(offset):
+        if (
+            not isinstance(value, (int, float))
+            or isinstance(value, bool)
+            or not math.isfinite(float(value))
+        ):
+            raise base.RecipeError(
+                f"scenario.launch_area.offset_m[{index}] must be finite"
+            )
+        values.append(float(value))
+    if values[2] < 0.0 or values[2] > 100.0:
+        raise base.RecipeError(
+            "scenario.launch_area.offset_m[2] must be in [0, 100]"
+        )
+    return {"mode": "manual", "offset_m": values, "search_radius_m": 0.0}
+
+
 def _formation_scale_m(
     experiment_path: Path, override: float | None = None
 ) -> float:
@@ -1114,6 +1181,7 @@ def _load_base_compatible_experiment(path: Path):
     formation_scale_m = _formation_scale_m(path)
     _formation_depth_m(path)
     _formation_audience_tilt_deg(path)
+    _launch_area_settings(path)
     maximum_speed_m_s = _max_speed_m_s(path)
     _, show_definition = _show_definition(path)
     compatibility_fields = sorted(
@@ -1132,6 +1200,7 @@ def _load_base_compatible_experiment(path: Path):
     del compatible_scenario["formation"]
     del compatible_scenario["max_speed_m_s"]
     del compatible_scenario["show_file"]
+    compatible_scenario.pop("launch_area", None)
     compatible_scenario.update(_BASE_SCENARIO_COMPATIBILITY)
     compatibility_scale = formation_scale_m / _LEGACY_BASE_FORMATION_SCALE_M
     compatible_scenario.update(
@@ -1188,6 +1257,13 @@ def _write_show_launcher(
     show_runtime.extend_asset_pdudef(
         paths.recipe_config / "pdudef" / "drone-pdudef-current.json"
     )
+    pdu_config_path = (
+        paths.recipe_config / "pdudef" / "drone-pdudef-current.json"
+    )
+    wind_endpoint_config = show_runtime.materialize_global_wind_asset_config(
+        paths.recipe_config / "global-wind-asset",
+        pdu_def_path=pdu_config_path,
+    )
     bridge_root = show_runtime.materialize_bridge_config(
         base.bridge_config_root(paths),
         paths.recipe_config / "web-bridge-drone-show",
@@ -1234,6 +1310,9 @@ def _write_show_launcher(
             ar_tls["server_certificate"] if ar_tls is not None else None
         ),
         ar_private_key=(ar_tls["server_key"] if ar_tls is not None else None),
+        global_wind_asset=SHOW_ROOT / "tools" / "global_wind_asset.py",
+        global_wind_endpoint_config=wind_endpoint_config,
+        pdu_config_path=pdu_config_path,
     )
 
 
@@ -1270,7 +1349,7 @@ def parser() -> argparse.ArgumentParser:
     result.add_argument("--timeout-sec", type=float, default=300.0)
     result.add_argument("--drone-count", type=int)
     result.add_argument("--process-count", type=int)
-    result.add_argument("--spawn-altitude-m", type=float, default=0.20)
+    result.add_argument("--spawn-altitude-m", type=float, default=0.50)
     result.add_argument("--spawn-spacing-m", type=float, default=1.0)
     result.add_argument(
         "--formation-scale",
@@ -1393,6 +1472,7 @@ def configure(args: argparse.Namespace, experiment_path: Path, drone_root: Path)
     formation_audience_tilt_deg = _formation_audience_tilt_deg(
         experiment_path, override=args.formation_tilt_deg
     )
+    launch_area = _launch_area_settings(experiment_path)
     show_definition_path, show_definition = _show_definition(experiment_path)
     viewer_settings = _viewer_settings(experiment_path)
     ar_settings = _ar_settings(experiment_path)
@@ -1428,6 +1508,7 @@ def configure(args: argparse.Namespace, experiment_path: Path, drone_root: Path)
             process_count=experiment.process_count,
             formation_rotation_deg=args.formation_rotation_deg,
             formation_tilt_deg=formation_audience_tilt_deg,
+            launch_area=launch_area,
         )
         marker_path = city_marker_path
     else:
@@ -1444,6 +1525,7 @@ def configure(args: argparse.Namespace, experiment_path: Path, drone_root: Path)
             process_count=experiment.process_count,
             formation_rotation_deg=args.formation_rotation_deg,
             formation_tilt_deg=formation_audience_tilt_deg,
+            launch_area=launch_area,
         )
         marker_path = flat_marker_path
     marker["drone_show"] = {
@@ -1518,6 +1600,10 @@ def configure(args: argparse.Namespace, experiment_path: Path, drone_root: Path)
     print(f"Formation scale        : {formation_scale_m:g} m")
     print(f"Formation depth        : {formation_depth_m:g} m")
     print(f"Formation audience tilt: {formation_audience_tilt_deg:g} deg")
+    print(
+        "Launch area             : "
+        f"{launch_area['mode']} offset_m={launch_area['offset_m']}"
+    )
     print(
         "Show File             : "
         f"{show_definition_path} ({len(show_definition['timeline'])} steps)"

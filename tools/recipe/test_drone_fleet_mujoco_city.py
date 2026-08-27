@@ -137,6 +137,74 @@ def generate_xml(scene, drone, count):
         ) ** 0.5
         self.assertGreaterEqual(separation, recipe.SPAWN_DEFAULT_SEPARATION_M)
 
+    def test_safe_spawn_height_uses_highest_surface_under_drone_footprint(self) -> None:
+        def sloped_height(x: float, _y: float) -> float:
+            return 5.004 if x > 0.5 else 5.0
+
+        points = recipe._select_safe_spawn_points(
+            drone_count=1,
+            half_extent_m={"north_south": 20.0, "east_west": 20.0},
+            terrain_height=sloped_height,
+            city_height=sloped_height,
+        )
+
+        self.assertEqual((points[0]["x_m"], points[0]["y_m"]), (0.0, 0.0))
+        self.assertAlmostEqual(points[0]["terrain_height_m"], 5.0)
+        self.assertAlmostEqual(points[0]["surface_height_m"], 5.004)
+
+    def test_safe_spawn_selection_searches_around_requested_center(self) -> None:
+        points = recipe._select_safe_spawn_points(
+            drone_count=4,
+            half_extent_m={"north_south": 50.0, "east_west": 50.0},
+            terrain_height=lambda _x, _y: 5.0,
+            city_height=lambda _x, _y: 5.0,
+            center_m=(12.0, -8.0),
+        )
+
+        self.assertAlmostEqual(
+            sum(point["x_m"] for point in points) / len(points), 12.0
+        )
+        self.assertAlmostEqual(
+            sum(point["y_m"] for point in points) / len(points), -8.0
+        )
+        self.assertTrue(
+            all(
+                math.hypot(point["x_m"] - 12.0, point["y_m"] + 8.0)
+                <= 40.0
+                for point in points
+            )
+        )
+
+    def test_safe_spawn_selection_rejects_steep_takeoff_footprint(self) -> None:
+        def steep_center(x: float, y: float) -> float:
+            if abs(x) <= 0.75 and abs(y) <= 0.75 and x > 0.5:
+                return 5.15
+            return 5.0
+
+        points = recipe._select_safe_spawn_points(
+            drone_count=1,
+            half_extent_m={"north_south": 20.0, "east_west": 20.0},
+            terrain_height=steep_center,
+            city_height=steep_center,
+        )
+
+        self.assertNotEqual((points[0]["x_m"], points[0]["y_m"]), (0.0, 0.0))
+
+    def test_manual_spawn_trusts_requested_grid_without_flatness_validation(self) -> None:
+        points = recipe._manual_spawn_points(
+            drone_count=4,
+            half_extent_m={"north_south": 100.0, "east_west": 100.0},
+            terrain_height=lambda x, _y: 5.0 + x * 0.1,
+            city_height=lambda x, _y: 5.0 + x * 0.1,
+            spawn_spacing_m=1.0,
+            center_m=(-50.0, 0.0),
+        )
+
+        self.assertEqual(len(points), 4)
+        self.assertAlmostEqual(
+            sum(point["x_m"] for point in points) / len(points), -50.0
+        )
+
     def test_compact_spawn_formation_fits_64_drones_with_one_meter_spacing(self) -> None:
         points = recipe._select_safe_spawn_points(
             drone_count=64,
@@ -159,6 +227,16 @@ def generate_xml(scene, drone, count):
                     ),
                     1.0,
                 )
+
+    def test_formation_clearance_probes_only_formation_neighborhoods(self) -> None:
+        targets = [(-1.0, 0.0), (1.0, 0.0), (0.0, 8.0)]
+
+        points = recipe._formation_clearance_points(targets)
+
+        self.assertIn((-1.0, 0.0), points)
+        self.assertIn((1.0, 0.0), points)
+        self.assertIn((0.0, 8.0), points)
+        self.assertEqual(len(points), 27)
 
     def test_spawn_spacing_accepts_compact_positive_values(self) -> None:
         points = recipe._select_safe_spawn_points(

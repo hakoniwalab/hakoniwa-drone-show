@@ -57,6 +57,71 @@ def write_show_definition(root: Path) -> Path:
 
 
 class VirtualDroneShowTest(unittest.TestCase):
+    def test_launch_area_defaults_to_auto(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            experiment = Path(temporary) / "experiment.yaml"
+            experiment.write_text("version: 1\n", encoding="utf-8")
+            self.assertEqual(
+                recipe._launch_area_settings(experiment),
+                {
+                    "mode": "auto",
+                    "offset_m": [0.0, 0.0, 0.0],
+                    "search_radius_m": 100.0,
+                },
+            )
+
+    def test_launch_area_accepts_manual_relative_offset(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            experiment = Path(temporary) / "experiment.yaml"
+            experiment.write_text(
+                """scenario:
+  launch_area:
+    mode: manual
+    offset_m: [20, -30, 1.5]
+""",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                recipe._launch_area_settings(experiment),
+                {
+                    "mode": "manual",
+                    "offset_m": [20.0, -30.0, 1.5],
+                    "search_radius_m": 0.0,
+                },
+            )
+
+    def test_launch_area_rejects_offset_in_auto_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            experiment = Path(temporary) / "experiment.yaml"
+            experiment.write_text(
+                """scenario:
+  launch_area:
+    mode: auto
+    offset_m: [0, 0, 0]
+""",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(
+                recipe.base.RecipeError, "only valid in manual mode"
+            ):
+                recipe._launch_area_settings(experiment)
+
+    def test_launch_area_rejects_invalid_manual_offset(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            experiment = Path(temporary) / "experiment.yaml"
+            experiment.write_text(
+                """scenario:
+  launch_area:
+    mode: manual
+    offset_m: [20, -30]
+""",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(
+                recipe.base.RecipeError, r"must contain \[x, y, z\]"
+            ):
+                recipe._launch_area_settings(experiment)
+
     def test_show_formation_scale_is_adapted_for_base_recipe(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -80,6 +145,7 @@ scenario:
             self.assertEqual(recipe._max_speed_m_s(experiment), 20.0)
             compatible = recipe._load_base_compatible_experiment(experiment)
             self.assertNotIn("formation", compatible["scenario"])
+            self.assertNotIn("launch_area", compatible["scenario"])
             self.assertEqual(compatible["scenario"]["type"], "hakoniwa-word")
             self.assertEqual(compatible["scenario"]["word"], "HAKONIWA")
             self.assertEqual(compatible["scenario"]["letter_width_m"], 10.0)
@@ -272,9 +338,7 @@ scenario:
         self.assertNotIn("viewer", compatible)
         self.assertNotIn("ar", compatible)
         ar = recipe._ar_settings(recipe.DEFAULT_EXPERIMENT)
-        self.assertTrue(ar["enabled"])
-        self.assertEqual(ar["preview"]["location_source"], "override")
-        self.assertIsNotNone(ar["preview"]["override"])
+        self.assertFalse(ar["enabled"])
 
     def test_ar_override_is_required_for_override_mode(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -557,7 +621,7 @@ scenario:
                 "center_m": [0.0, -34.0],
                 "width_m": 44.0,
                 "depth_m": 16.0,
-                "ground_height_m": 5.5,
+                "ground_height_m": 33.26,
                 "lighting": {
                     "enabled": True,
                     "intensity": 140.0,
@@ -749,6 +813,14 @@ scenario:
             self.assertEqual(city_configure.call_args.kwargs["process_count"], 6)
             self.assertEqual(
                 city_configure.call_args.kwargs["formation_tilt_deg"], 60.0
+            )
+            self.assertEqual(
+                city_configure.call_args.kwargs["launch_area"],
+                {
+                    "mode": "auto",
+                    "offset_m": [0.0, 0.0, 0.0],
+                    "search_radius_m": 100.0,
+                },
             )
             self.assertEqual(
                 marker["drone_show"],
