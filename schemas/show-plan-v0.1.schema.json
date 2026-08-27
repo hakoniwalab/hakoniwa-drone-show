@@ -108,7 +108,8 @@
         "scale_m": { "type": "number", "exclusiveMinimum": 0 },
         "translation_m": { "$ref": "#/$defs/position" },
         "yaw_deg": { "type": "number", "minimum": 0, "exclusiveMaximum": 360 },
-        "tilt_deg": { "type": "number", "minimum": -90, "maximum": 90 }
+        "tilt_deg": { "type": "number", "minimum": -90, "maximum": 90 },
+        "depth_m": { "type": "number", "minimum": 0 }
       }
     },
     "ledState": {

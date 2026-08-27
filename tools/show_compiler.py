@@ -47,7 +47,10 @@ def _clean(value: float) -> float:
 
 
 def transform_position(
-    position: list[float], transform: dict[str, Any]
+    position: list[float],
+    transform: dict[str, Any],
+    *,
+    additional_depth_m: float = 0.0,
 ) -> list[float]:
     """Map Formation [right, up, depth] into local ENU meters."""
     right, up, depth = (float(component) for component in position)
@@ -76,9 +79,42 @@ def transform_position(
                 + up * tilted_up[axis]
                 + depth * tilted_depth[axis]
             )
+            + float(additional_depth_m) * tilted_depth[axis]
         )
         for axis in range(3)
     ]
+
+
+def transform_formation_positions(
+    positions: list[list[float]], transform: dict[str, Any]
+) -> list[list[float]]:
+    """Transform a Formation, optionally curving its center toward the audience."""
+
+    if not positions:
+        return []
+    depth_m = float(transform.get("depth_m", 0.0))
+    rights = [float(position[0]) for position in positions]
+    center_right = (min(rights) + max(rights)) / 2.0
+    half_width = (max(rights) - min(rights)) / 2.0
+    transformed = []
+    for position in positions:
+        normalized_right = (
+            (float(position[0]) - center_right) / half_width
+            if half_width > 0.0
+            else 0.0
+        )
+        curve = max(0.0, 1.0 - normalized_right * normalized_right)
+        # Negative Formation depth is the audience-facing side. Positive
+        # depth_m therefore produces a convex screen without changing its
+        # front projection.
+        transformed.append(
+            transform_position(
+                position,
+                transform,
+                additional_depth_m=-depth_m * curve,
+            )
+        )
+    return transformed
 
 
 def assign_point_indices(
@@ -162,10 +198,10 @@ def compile_show(
     for step in plan["timeline"]:
         formation = formations[step["formation_id"]]
         transform = step.get("transform", plan["defaults"]["transform"])
-        target_positions = [
-            transform_position(point["position"], transform)
-            for point in formation["points"]
-        ]
+        target_positions = transform_formation_positions(
+            [point["position"] for point in formation["points"]],
+            transform,
+        )
         assignments = assign_point_indices(
             [state["position_m"] for state in current_states],
             target_positions,

@@ -103,6 +103,7 @@ def _validate_transform(value: Any, path: str) -> None:
         transform,
         path,
         required={"scale_m", "translation_m", "yaw_deg", "tilt_deg"},
+        optional={"depth_m"},
     )
     if _number(transform["scale_m"], f"{path}.scale_m") <= 0:
         _fail(f"{path}.scale_m", "must be positive")
@@ -117,6 +118,8 @@ def _validate_transform(value: Any, path: str) -> None:
         _fail(f"{path}.yaw_deg", "must be within [0, 360)")
     if not -90 <= tilt <= 90:
         _fail(f"{path}.tilt_deg", "must be within [-90, 90]")
+    if "depth_m" in transform:
+        _non_negative(transform["depth_m"], f"{path}.depth_m")
 
 
 def _validate_led_state(value: Any, path: str) -> None:

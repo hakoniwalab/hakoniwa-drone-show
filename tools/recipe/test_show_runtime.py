@@ -320,7 +320,12 @@ class ShowRuntimeTest(unittest.TestCase):
                 },
             )
             self.assertEqual(
-                runtime["led_appearance"], {"scale": 2.0, "intensity": 1.75}
+                runtime["led_appearance"],
+                {
+                    "scale": 2.0,
+                    "intensity": 1.75,
+                    "spatialDepthCue": False,
+                },
             )
             self.assertTrue(runtime["ar"]["enabled"])
             self.assertEqual(runtime["ar"]["ground_height_m"], 0.0)
@@ -406,6 +411,7 @@ class ShowRuntimeTest(unittest.TestCase):
                     "fleet_config": str(fleet_path),
                     "drone_show": {
                         "formation_scale_m": 15.0,
+                        "formation_depth_m": 3.0,
                         "show_definition": {
                             "path": str(SHOW_DEFINITION),
                             "sha256": show_runtime._sha256(SHOW_DEFINITION),
@@ -439,6 +445,7 @@ class ShowRuntimeTest(unittest.TestCase):
             )
             self.assertEqual(plan["defaults"]["transform"]["scale_m"], 15.0)
             self.assertEqual(plan["defaults"]["transform"]["tilt_deg"], 30.0)
+            self.assertEqual(plan["defaults"]["transform"]["depth_m"], 3.0)
 
     def test_runtime_uses_external_formation_order_and_timing(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

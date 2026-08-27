@@ -58,6 +58,7 @@ Formationの`[right, up, depth]`をShow IRのローカルENUメートルへ変�
 - `translation_m`: `[east, north, up]`のFormation原点
 - `yaw_deg`: ENU Up軸周りの反時計回り回転。0度ではrightがEast、depthがNorth
 - `tilt_deg`: Formation right軸周りの傾斜。正値では上端がNorth側へ傾く
+- `depth_m`（任意）: 左右端を保ち、中央を観客側へ湾曲させる最大奥行き。既定値0
 
 角度をラジアンへ変換し、`R=(cos(yaw), sin(yaw), 0)`、`D=(-sin(yaw), cos(yaw), 0)`、
 `U=(0,0,1)`とします。tilt後の軸は`U'=cos(tilt)U+sin(tilt)D`、
@@ -68,8 +69,12 @@ Formationの`[right, up, depth]`をShow IRのローカルENUメートルへ変�
 translation_m + scale_m * (right*R + up*U' + depth*D')
 ```
 
+`depth_m > 0`の場合、Formationの左右範囲を`[-1, 1]`へ正規化した値を`r`として、
+各pointへ`-depth_m * max(0, 1-r²) * D'`を加えます。これにより正面投影を維持した
+円筒状の奥行きを作ります。
+
 stepに`transform`がなければ`defaults.transform`をそのまま使います。v0.1のstep別
-transformは部分差分ではなく4 fieldすべてを指定します。
+transformは部分差分ではなく必須4 fieldすべてを指定します。`depth_m`は省略できます。
 
 ## timing
 

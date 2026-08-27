@@ -30,6 +30,7 @@ python3 tools/recipe/virtual_drone_show.py configure \
 scenario:
   formation:
     scale_m: 15.33125
+    depth_m: 3.0
 ```
 
 この値を小さくすると顔全体が小さくなり、大きくすると拡大します。現在の
@@ -40,6 +41,10 @@ scenario:
 `scale_m`はFormationの向き（yaw/tilt）を適用する前の公称寸法です。向きを変えた後の
 ENU各軸のaxis-aligned bounding boxは、回転によってこの値より小さく見える場合が
 あります。
+
+`depth_m`は、正面シルエットを保ったままFormationを観客側へ湾曲させる最大奥行きです。
+左右端は元の平面上に残り、横方向の中央ほど最大`depth_m`だけ手前へ出ます。`0`なら
+従来どおり完全な平面です。値は`0`以上`scale_m`以下にします。
 
 ## 全設定項目
 
@@ -93,6 +98,7 @@ Worldにおける中央離陸地点の高さへ合わせています。
 | `viewer.initial_mode` | `free`または`audience` | ブラウザ起動時の視点です。`free`は従来のOrbitカメラ、`audience`は下記の観客視点です。ブラウザ上でいつでも切り替えられます。 |
 | `viewer.led_appearance.scale` | 0より大きく4以下 | LEDスプライト全体の表示サイズ倍率です。機体間隔やFormation寸法は変わりません。既定値は`1.45`です。 |
 | `viewer.led_appearance.intensity` | 0より大きく4以下 | Show Planで解決された機体別brightnessへ掛ける、画面表示全体の発光強度倍率です。既定値は`1.25`です。 |
+| `viewer.led_appearance.spatial_depth_cue` | 真偽値 | `true`では近距離のLEDハローを抑え、立体LEDコアと白い機体を見せます。遠距離では従来どおりLEDを強調します。 |
 | `viewer.audience_camera.position_m` | 3要素の数値配列 | 観客カメラの初期位置をローカルENU座標`[East, North, Up]`（m）で指定します。 |
 | `viewer.audience_camera.yaw_deg` | 数値 | 水平向きです。0度はEast、正方向はNorth側です。 |
 | `viewer.audience_camera.pitch_deg` | -85〜85 | 仰角です。0度は水平、正方向は上です。 |
@@ -148,6 +154,7 @@ ARの初期位置は端末GPSまたは`override`から一度だけ計算し、�
 |---|---|---|
 | `scenario.show_file` | experimentからの相対パス | 機体数非依存のShow Fileです。SVG一覧、実行順、移動・待機時間、LEDを定義します。詳細は[Show File v1](show-file-v1.md)を参照してください。 |
 | `scenario.formation.scale_m` | 0より大きい数値 | 全Formationの公称最大寸法（m）です。顔の大きさを直接調整する項目です。詳細は「Formationの大きさ」を参照してください。 |
+| `scenario.formation.depth_m` | 0以上`scale_m`以下 | Formation中央を観客側へ湾曲させる最大奥行き（m）です。`0`は平面です。 |
 | `scenario.formation.audience_tilt_deg` | -85〜85の数値 | Formation平面を水平面から起こす角度（度）です。0度は上空から見やすい水平、絶対値が90度に近いほど地上の観客へ正対し、符号で傾斜方向が反転します。現在は反対方向を確認できるよう`-60`度に設定しています。`configure --formation-tilt-deg`で一時上書きできます。 |
 | `scenario.altitude_m` | 0.5以上の数値 | `flat`では床からのFormation最低高度（AGL）です。`plateau`ではCity飛行計画が要求する最低クリアランスで、最終高度はCity colliderと`--altitude-mode`等から解決されます。 |
 | `scenario.max_speed_m_s` | 0より大きい数値 | 機体へ許可する最大移動速度（m/s）です。実際の指令速度は各機体の移動距離をShow Fileの`transition_sec`で割って求めます。configureは必要最大速度がこの値を超える計画をエラーにし、runtimeにも同じ上限を安全策として渡します。値を大きくしても計画時刻より早く到着する設定にはなりません。 |

@@ -73,6 +73,7 @@ scenario:
                 encoding="utf-8",
             )
             self.assertEqual(recipe._formation_scale_m(experiment), 61.325)
+            self.assertEqual(recipe._formation_depth_m(experiment), 0.0)
             self.assertEqual(
                 recipe._formation_audience_tilt_deg(experiment), 15.0
             )
@@ -207,6 +208,7 @@ scenario:
         self.assertLessEqual(viewer["led_appearance"]["scale"], 4.0)
         self.assertGreater(viewer["led_appearance"]["intensity"], 0.0)
         self.assertLessEqual(viewer["led_appearance"]["intensity"], 4.0)
+        self.assertIs(viewer["led_appearance"]["spatial_depth_cue"], True)
         compatible = recipe._load_base_compatible_experiment(
             recipe.DEFAULT_EXPERIMENT
         )
@@ -375,6 +377,22 @@ scenario:
             ):
                 recipe._formation_audience_tilt_deg(experiment)
 
+    def test_formation_depth_must_not_exceed_scale(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            experiment = Path(temporary) / "experiment.yaml"
+            experiment.write_text(
+                """scenario:
+  formation:
+    scale_m: 15
+    depth_m: 16
+""",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(
+                recipe.base.RecipeError, "depth_m must be between 0 and scale_m"
+            ):
+                recipe._formation_depth_m(experiment)
+
     def test_configure_requires_city_world_in_plateau_mode(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             experiment = Path(temporary) / "plateau.yaml"
@@ -515,6 +533,9 @@ scenario:
                     recipe, "_formation_scale_m", return_value=15.0
                 ),
                 mock.patch.object(
+                    recipe, "_formation_depth_m", return_value=0.0
+                ),
+                mock.patch.object(
                     recipe,
                     "_formation_audience_tilt_deg",
                     return_value=60.0,
@@ -590,6 +611,7 @@ scenario:
                 marker["drone_show"],
                 {
                     "formation_scale_m": 15.0,
+                    "formation_depth_m": 0.0,
                     "max_speed_m_s": 20.0,
                     "viewer": {
                         "initial_mode": "free",

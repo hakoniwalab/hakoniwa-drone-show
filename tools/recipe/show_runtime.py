@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from tools import show_control_protocol as protocol
-from tools.show_compiler import compile_show
+from tools.show_compiler import compile_show, transform_formation_positions
 from tools.show_file import ShowFileError, load_show_file
 from tools.svg_to_formation import SvgConversionError, convert_svg
 
@@ -186,6 +186,11 @@ def _materialize_show_ir(*, recipe_config: Path, marker: dict[str, Any]) -> Path
     scale_m = float(show_config["formation_scale_m"])
     if not scale_m > 0:
         raise ShowRuntimeError("drone_show.formation_scale_m must be positive")
+    depth_m = float(show_config.get("formation_depth_m", 0.0))
+    if not 0.0 <= depth_m <= scale_m:
+        raise ShowRuntimeError(
+            "drone_show.formation_depth_m must be within [0, formation_scale_m]"
+        )
     flight_plan = marker.get("flight_plan", {})
     flight_altitude_m = float(flight_plan["resolved_flight_altitude_m"])
     legacy_audience_tilt_deg = float(
@@ -197,22 +202,29 @@ def _materialize_show_ir(*, recipe_config: Path, marker: dict[str, Any]) -> Path
     # angles: +60 -> +30 and -60 -> -30. Zero keeps the established +90
     # horizontal orientation.
     tilt_deg = _show_plan_tilt_from_audience(legacy_audience_tilt_deg)
-    # Formation points are centered. Lift the center so their lowest Up value
-    # remains at or above the route-safe flight altitude.
-    minimum_normalized_up = min(
-        float(point["position"][1])
-        for reference in formation_references
-        for point in _read_json(output_root / reference["path"])["points"]
-    )
-    center_altitude_m = flight_altitude_m - (
-        scale_m * minimum_normalized_up * math.cos(math.radians(tilt_deg))
-    )
+    # Resolve the curved Formation around a zero-altitude origin first, then
+    # lift its lowest point to the route-safe flight altitude.
     transform = {
         "scale_m": scale_m,
-        "translation_m": [0.0, 0.0, center_altitude_m],
+        "translation_m": [0.0, 0.0, 0.0],
         "yaw_deg": 0.0,
         "tilt_deg": tilt_deg,
+        "depth_m": depth_m,
     }
+    minimum_relative_altitude_m = min(
+        position[2]
+        for reference in formation_references
+        for position in transform_formation_positions(
+            [
+                point["position"]
+                for point in _read_json(output_root / reference["path"])["points"]
+            ],
+            transform,
+        )
+    )
+    transform["translation_m"][2] = (
+        flight_altitude_m - minimum_relative_altitude_m
+    )
     timeline = []
     for source_step in definition["timeline"]:
         source_led = source_step["led"]
@@ -526,7 +538,8 @@ def materialize_browser(
     network = viewer_settings.get("network", {"host": "127.0.0.1"})
     websocket_host = network.get("host", "127.0.0.1")
     led_appearance = viewer_settings.get(
-        "led_appearance", {"scale": 1.45, "intensity": 1.25}
+        "led_appearance",
+        {"scale": 1.45, "intensity": 1.25, "spatial_depth_cue": False},
     )
     if (
         not isinstance(led_appearance, dict)
@@ -540,6 +553,10 @@ def materialize_browser(
     ):
         raise ShowRuntimeError(
             "drone_show.viewer.led_appearance scale/intensity must be within (0, 4]"
+        )
+    if not isinstance(led_appearance.get("spatial_depth_cue", False), bool):
+        raise ShowRuntimeError(
+            "drone_show.viewer.led_appearance.spatial_depth_cue must be boolean"
         )
     if audience is not None:
         viewer_config["three"]["audienceCamera"] = {
@@ -566,6 +583,7 @@ def materialize_browser(
         "led_appearance": {
             "scale": float(led_appearance["scale"]),
             "intensity": float(led_appearance["intensity"]),
+            "spatialDepthCue": led_appearance.get("spatial_depth_cue", False),
         },
         "camera": {
             "initial_mode": initial_mode,

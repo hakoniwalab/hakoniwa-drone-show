@@ -29,6 +29,7 @@ viewer:
   led_appearance:
     scale: 1.45
     intensity: 1.25
+    spatial_depth_cue: true
   audience_camera:
     position_m: [0.0, -30.0, 6.0]
     yaw_deg: 90.0
@@ -54,6 +55,7 @@ scenario:
   show_file: ../../shows/kids-space-adventure.show.json
   formation:
     scale_m: 20
+    depth_m: 3.0
     audience_tilt_deg: -60.0
   altitude_m: 10.0
   max_speed_m_s: 20.0

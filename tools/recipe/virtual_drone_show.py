@@ -406,7 +406,9 @@ def _formation_scale_m(
     formation = scenario.get("formation") if isinstance(scenario, dict) else None
     if not isinstance(formation, dict):
         raise base.RecipeError("scenario.formation must be a mapping")
-    unknown = sorted(set(formation) - {"scale_m", "audience_tilt_deg"})
+    unknown = sorted(
+        set(formation) - {"scale_m", "audience_tilt_deg", "depth_m"}
+    )
     if unknown:
         raise base.RecipeError(
             "scenario.formation has unknown fields: " + ", ".join(unknown)
@@ -419,6 +421,30 @@ def _formation_scale_m(
         or not float(value) > 0
     ):
         raise base.RecipeError("scenario.formation.scale_m must be positive")
+    return float(value)
+
+
+def _formation_depth_m(
+    experiment_path: Path, *, scale_m: float | None = None
+) -> float:
+    raw = _BASE_LOAD_SIMPLE_YAML(experiment_path)
+    scenario = raw.get("scenario")
+    formation = scenario.get("formation") if isinstance(scenario, dict) else None
+    if not isinstance(formation, dict):
+        raise base.RecipeError("scenario.formation must be a mapping")
+    value = formation.get("depth_m", 0.0)
+    resolved_scale_m = (
+        _formation_scale_m(experiment_path) if scale_m is None else float(scale_m)
+    )
+    if (
+        not isinstance(value, (int, float))
+        or isinstance(value, bool)
+        or not math.isfinite(float(value))
+        or not 0.0 <= float(value) <= resolved_scale_m
+    ):
+        raise base.RecipeError(
+            "scenario.formation.depth_m must be between 0 and scale_m"
+        )
     return float(value)
 
 
@@ -504,7 +530,9 @@ def _viewer_settings(experiment_path: Path) -> dict:
     if led_appearance is not None:
         if not isinstance(led_appearance, dict):
             raise base.RecipeError("viewer.led_appearance must be a mapping")
-        unknown_led = sorted(set(led_appearance) - {"scale", "intensity"})
+        unknown_led = sorted(
+            set(led_appearance) - {"scale", "intensity", "spatial_depth_cue"}
+        )
         if unknown_led:
             raise base.RecipeError(
                 "viewer.led_appearance has unknown fields: "
@@ -523,6 +551,12 @@ def _viewer_settings(experiment_path: Path) -> dict:
                     f"viewer.led_appearance.{key} must be within (0, 4]"
                 )
             resolved_led[key] = float(value)
+        spatial_depth_cue = led_appearance.get("spatial_depth_cue", False)
+        if not isinstance(spatial_depth_cue, bool):
+            raise base.RecipeError(
+                "viewer.led_appearance.spatial_depth_cue must be boolean"
+            )
+        resolved_led["spatial_depth_cue"] = spatial_depth_cue
         settings["led_appearance"] = resolved_led
     camera = viewer.get("audience_camera")
     if initial_mode == "audience" and not isinstance(camera, dict):
@@ -792,6 +826,7 @@ def _load_base_compatible_experiment(path: Path):
         compatible.pop("ar", None)
         return compatible
     formation_scale_m = _formation_scale_m(path)
+    _formation_depth_m(path)
     _formation_audience_tilt_deg(path)
     maximum_speed_m_s = _max_speed_m_s(path)
     _, show_definition = _show_definition(path)
@@ -1059,6 +1094,9 @@ def configure(args: argparse.Namespace, experiment_path: Path, drone_root: Path)
     formation_scale_m = _formation_scale_m(
         experiment_path, override=args.formation_scale
     )
+    formation_depth_m = _formation_depth_m(
+        experiment_path, scale_m=formation_scale_m
+    )
     formation_audience_tilt_deg = _formation_audience_tilt_deg(
         experiment_path, override=args.formation_tilt_deg
     )
@@ -1117,6 +1155,7 @@ def configure(args: argparse.Namespace, experiment_path: Path, drone_root: Path)
         marker_path = flat_marker_path
     marker["drone_show"] = {
         "formation_scale_m": formation_scale_m,
+        "formation_depth_m": formation_depth_m,
         "max_speed_m_s": experiment.speed_m_s,
         "viewer": viewer_settings,
         "ar": ar_settings,
@@ -1183,6 +1222,7 @@ def configure(args: argparse.Namespace, experiment_path: Path, drone_root: Path)
     print(f"Drone PRO              : {drone_root}")
     print(f"MuJoCo process models  : {len(marker['process_models'])}")
     print(f"Formation scale        : {formation_scale_m:g} m")
+    print(f"Formation depth        : {formation_depth_m:g} m")
     print(f"Formation audience tilt: {formation_audience_tilt_deg:g} deg")
     print(
         "Show File             : "

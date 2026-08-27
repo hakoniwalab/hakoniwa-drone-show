@@ -6,7 +6,13 @@ import unittest
 from pathlib import Path
 
 from tools.initial_fleet_state import generate_grid
-from tools.show_compiler import ShowCompileError, assign_point_indices, compile_show, transform_position
+from tools.show_compiler import (
+    ShowCompileError,
+    assign_point_indices,
+    compile_show,
+    transform_formation_positions,
+    transform_position,
+)
 from tools.show_ir import validate_show_ir
 
 
@@ -75,6 +81,36 @@ class ShowCompilerTest(unittest.TestCase):
             "tilt_deg": 0.0,
         }
         self.assertEqual(transform_position([1.0, 2.0, 3.0], transform), [12.0, 26.0, 34.0])
+
+    def test_depth_curves_center_toward_audience_and_preserves_edges(self) -> None:
+        transform = {
+            "scale_m": 20.0,
+            "translation_m": [0.0, 0.0, 10.0],
+            "yaw_deg": 0.0,
+            "tilt_deg": 0.0,
+            "depth_m": 3.0,
+        }
+        self.assertEqual(
+            transform_formation_positions(
+                [[-0.5, 0.0, 0.0], [0.0, 0.0, 0.0], [0.5, 0.0, 0.0]],
+                transform,
+            ),
+            [[-10.0, 0.0, 10.0], [0.0, -3.0, 10.0], [10.0, 0.0, 10.0]],
+        )
+
+    def test_zero_depth_is_backward_compatible(self) -> None:
+        transform = {
+            "scale_m": 2.0,
+            "translation_m": [10.0, 20.0, 30.0],
+            "yaw_deg": 0.0,
+            "tilt_deg": 0.0,
+            "depth_m": 0.0,
+        }
+        position = [1.0, 2.0, 3.0]
+        self.assertEqual(
+            transform_formation_positions([position], transform),
+            [transform_position(position, transform)],
+        )
 
 
 if __name__ == "__main__":
