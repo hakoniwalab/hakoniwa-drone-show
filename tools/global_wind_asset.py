@@ -23,11 +23,13 @@ from hakoniwa_pdu.pdu_msgs.hako_msgs.pdu_pytype_Disturbance import Disturbance
 from hakoniwa_pdu_endpoint.c_endpoint import Endpoint, PduResolvedKey
 
 from tools import global_wind_protocol as protocol
+from tools import show_control_protocol
 from tools.global_wind_fanout import (
     GlobalWindAssetRuntime,
     GlobalWindFanout,
     GlobalWindFanoutError,
 )
+from tools.wind_scenario import WindScenarioError, WindScenarioPlayer, load_wind_scenario
 
 
 def resolve_drone_names(pdu_config_path: Path) -> tuple[str, ...]:
@@ -53,11 +55,22 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--pdu-config-path", type=Path, required=True)
     parser.add_argument("--asset-name", default="GlobalWindAsset")
     parser.add_argument("--delta-time-msec", type=int, default=20)
+    parser.add_argument(
+        "--scenario",
+        type=Path,
+        help="Replay a validated wind scenario using Show Status show_time_usec",
+    )
     args = parser.parse_args(argv)
     if args.delta_time_msec < 1:
         parser.error("--delta-time-msec must be positive")
 
     pdu_config_path = args.pdu_config_path.resolve()
+    scenario_player = None
+    if args.scenario is not None:
+        try:
+            scenario_player = WindScenarioPlayer(load_wind_scenario(args.scenario))
+        except WindScenarioError as exc:
+            parser.error(str(exc))
     drone_names = resolve_drone_names(pdu_config_path)
     manager = PduManager()
     manager.initialize(
@@ -86,6 +99,8 @@ def main(argv: list[str] | None = None) -> int:
         )
 
     def on_wind(_key, payload: bytes) -> None:
+        if scenario_player is not None:
+            return
         try:
             message = protocol.decode_frame(payload)
             if message is None:
@@ -134,7 +149,36 @@ def main(argv: list[str] | None = None) -> int:
 
     def on_manual_timing_control(_context) -> int:
         while hakopy.usleep(args.delta_time_msec * 1000):
-            pass
+            if scenario_player is None:
+                continue
+            raw = hakopy.pdu_read(
+                show_control_protocol.ROBOT_NAME,
+                show_control_protocol.STATUS_CHANNEL_ID,
+                show_control_protocol.FRAME_SIZE,
+            )
+            if raw is None:
+                continue
+            try:
+                status = show_control_protocol.decode_frame(raw)
+                if status is None:
+                    continue
+                for command in scenario_player.observe_status(status):
+                    result = fanout.accept(command)
+                    event = command["wind"]
+                    log_result(
+                        "scenario "
+                        f"show_time_usec={status['show_time_usec']} "
+                        f"enabled={str(event['enabled']).lower()} "
+                        f"vector_ros_m_s={event['vector_ros_m_s']}",
+                        result,
+                    )
+            except (
+                show_control_protocol.ProtocolError,
+                WindScenarioError,
+                protocol.GlobalWindProtocolError,
+                GlobalWindFanoutError,
+            ) as exc:
+                print(f"[GLOBAL_WIND] scenario status rejected: {exc}", flush=True)
         return 0
 
     callbacks = {

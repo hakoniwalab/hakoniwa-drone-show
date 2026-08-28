@@ -9,12 +9,19 @@ import { flowDirectionToRos, normalizeDirectionFromDeg } from './global-wind-pro
 import { GlobalWindLiveController } from './global-wind-live-controller.mjs';
 import { OpenMeteoProvider } from './open-meteo-provider.mjs';
 import { cameraHeadingDisplay } from './camera-heading.mjs';
+import {
+  validateWindScenarioForViewer,
+  windScenarioEventAt,
+} from './wind-scenario-view.mjs';
+import { formatStatusTimeUsec } from './show-clock.mjs';
 
 const ui = {
   state: document.getElementById('show-state'),
   detail: document.getElementById('show-detail'),
   start: document.getElementById('show-start'),
   droneCount: document.getElementById('drone-count'),
+  hakoniwaTime: document.getElementById('hakoniwa-time'),
+  showTime: document.getElementById('show-time'),
   cameraAudience: document.getElementById('camera-audience'),
   cameraFree: document.getElementById('camera-free'),
   cameraMovementToggle: document.getElementById('camera-movement-toggle'),
@@ -80,6 +87,7 @@ let viewer = null;
 let controlClient = null;
 let globalWindClient = null;
 let globalWindLiveController = null;
+let windScenario = null;
 let windMode = 'manual';
 let manualWindDraft = { enabled: false, directionToDeg: 0, speedMps: 0 };
 let latestStatus = null;
@@ -191,16 +199,53 @@ function renderLiveWind(state) {
   }
 }
 
+async function loadWindScenario(config) {
+  const response = await fetch(config.url, { cache: 'no-store' });
+  if (!response.ok) throw new Error(`Wind Scenario load failed: ${response.status}`);
+  const encoded = new Uint8Array(await response.arrayBuffer());
+  const actualSha256 = bytesToHex(await sha256Bytes(encoded));
+  if (actualSha256 !== config.sha256) {
+    throw new Error('Wind Scenario hash does not match runtime configuration');
+  }
+  const value = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(encoded));
+  return validateWindScenarioForViewer(value);
+}
+
+function renderScenarioWind(status) {
+  if (!windScenario) return;
+  const active = windScenarioEventAt(windScenario, status.show_time_usec);
+  if (!active) {
+    ui.windStatus.textContent = `Scenario ${windScenario.scenarioId}: takeoff完了待ち`;
+    return;
+  }
+  const event = active.event;
+  ui.windEnabled.checked = event.enabled;
+  ui.windDirection.value = event.directionToDeg.toFixed(0);
+  ui.windSpeed.value = String(event.speedMps);
+  ui.windSpeedStddev.value = String(windScenario.speedStddevMps);
+  refreshManualWindDisplay();
+  ui.windStatus.textContent = (
+    `Scenario ${windScenario.scenarioId} / ${active.showTimeSec.toFixed(1)}秒 / `
+    + `event ${active.index + 1}`
+  );
+  ui.windStatus.dataset.failed = 'false';
+}
+
 function setWindInputMode(mode) {
   const live = mode === 'live';
+  const scenario = mode === 'scenario';
   windMode = mode;
   ui.windControls.dataset.mode = mode;
-  ui.windModeManual.dataset.active = String(!live);
+  ui.windModeManual.dataset.active = String(!live && !scenario);
   ui.windModeLive.dataset.active = String(live);
   ui.liveWindInfo.hidden = !live;
-  ui.windEnabled.disabled = live;
-  ui.windDirection.disabled = live;
-  ui.windSpeed.disabled = live;
+  ui.windModeManual.disabled = scenario;
+  ui.windModeLive.disabled = scenario;
+  ui.windEnabled.disabled = live || scenario;
+  ui.windDirection.disabled = live || scenario;
+  ui.windSpeed.disabled = live || scenario;
+  ui.windSpeedStddev.disabled = scenario;
+  ui.windCompass.style.pointerEvents = scenario ? 'none' : '';
 }
 
 async function selectWindMode(mode) {
@@ -231,6 +276,13 @@ async function initializeGlobalWind(config) {
   ui.windSpeed.value = String(manual.speed_m_s ?? 0);
   ui.windSpeedStddev.value = String(manual.speed_stddev_m_s ?? 0);
   manualWindDraft = currentManualWind();
+  if (config?.scenario?.enabled === true) {
+    windScenario = await loadWindScenario(config.scenario);
+    setWindInputMode('scenario');
+    ui.windStatus.textContent = `Scenario ${windScenario.scenarioId}: takeoff完了待ち`;
+    refreshManualWindDisplay();
+    return;
+  }
   const venue = config?.venue;
   if (!venue || !Number.isFinite(Number(venue.latitude)) || !Number.isFinite(Number(venue.longitude))) {
     throw new Error('Global Wind venue is missing');
@@ -557,6 +609,10 @@ async function loadViewerConfig(runtime) {
 function onShowStatus(status) {
   const runChanged = latestStatus?.run_id && latestStatus.run_id !== status.run_id;
   latestStatus = status;
+  ui.hakoniwaTime.textContent = formatStatusTimeUsec(status.simulation_time_usec);
+  ui.showTime.textContent = status.show_time_usec == null
+    ? 'takeoff待ち'
+    : formatStatusTimeUsec(status.show_time_usec);
   if (showIrSha256 && status.show_sha256 !== showIrSha256) {
     setUiState('failed', 'Show RunnerとブラウザのShow IRが一致しません');
     return;
@@ -569,6 +625,7 @@ function onShowStatus(status) {
       return;
     }
   }
+  if (windMode === 'scenario') renderScenarioWind(status);
   if (runChanged || status.state !== 'waiting') clearStartPending();
   const run = status.run_id ? `run ${status.run_id.slice(0, 8)}` : '';
   if (status.state === 'failed') setUiState('failed', status.error ?? 'Show Runner failed');

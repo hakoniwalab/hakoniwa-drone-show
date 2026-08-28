@@ -27,8 +27,20 @@ class ShowControlProtocolTest(unittest.TestCase):
             sequence=3,
             simulation_time_usec=20000,
             show_frame_index=3,
+            show_time_usec=12000,
         )
         self.assertEqual(protocol.decode_frame(protocol.encode_frame(message)), message)
+
+    def test_status_rejects_invalid_show_time(self) -> None:
+        with self.assertRaisesRegex(protocol.ProtocolError, "show_time_usec"):
+            protocol.show_status(
+                state="running",
+                run_id=RUN_ID,
+                show_sha256=SHOW_HASH,
+                sequence=1,
+                simulation_time_usec=0,
+                show_time_usec=-1,
+            )
 
     def test_status_rejects_invalid_show_frame_index(self) -> None:
         with self.assertRaisesRegex(protocol.ProtocolError, "show_frame_index"):

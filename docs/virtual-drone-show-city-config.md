@@ -129,12 +129,25 @@ Formation、Show IR、
 | `global_wind.live.poll_interval_sec` | 60〜86400 | 自動取得間隔です。既定は300秒です。 |
 | `global_wind.live.timeout_sec` | 1〜30 | HTTP取得timeoutです。 |
 | `global_wind.live.stale_after_sec` | poll間隔以上86400以下 | 最終成功値をSTALE表示へ切り替える時間です。 |
+| `global_wind.scenario.enabled` | 真偽値 | 再現可能なWind Scenarioを箱庭時刻で再生します。 |
+| `global_wind.scenario.file` | experimentからの相対パスまたは絶対パス | Wind Scenario v1 JSONです。相対パスはexperiment YAML基準です。 |
 
 Liveモードでは、会場座標をPLATEAU City Worldのorigin（flatではflat origin）から
 `configure`時に解決します。Open-Meteoの気象風向（from）を、実際に流れる方向（to）へ
 自動変換してコンパスへ表示します。平均風速と方向はprovider値ですが、標準偏差はブラウザで
 引き続き調整できます。`最新値を取得`は5分間隔を待たず即時取得し、同じ物理値ならPDUを
 再送しません。`Open-Meteoで確認`は、その取得に使うAPI URLを別タブで開きます。
+
+Scenarioを有効にすると、ブラウザのManual／Live入力はGlobal Wind Asset側で無視されます。
+イベントはShow IRの離陸完了を0秒とする`show_time_usec`に従い、既定約250 msの時刻通知で
+進行します。ブラウザは同じScenario JSONと`show_time_usec`から現在イベントを解決し、風向、
+平均風速、標準偏差をコンパスへ表示します。サンプルは
+`examples/wind-scenarios/osaka-gust-east.json`です。Manual／Liveへ
+戻す場合は`global_wind.scenario.enabled: false`にして、再度`configure`してください。
+
+衝突評価はtakeoff完了直後のカウンタをbaselineとして保存し、Scenarioの最終イベントから
+10秒後にfinalを取得して`validation/execution-summary.json`へ出力します。最後のFormationを
+表示し続ける時間とは独立しているため、評価結果のために表示保持の終了を待つ必要はありません。
 
 ### `environment`
 

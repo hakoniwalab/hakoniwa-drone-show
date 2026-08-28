@@ -54,7 +54,7 @@ export function validateMessage(message) {
     }
     const allowed = new Set([
       'schema_version', 'protocol', 'kind', 'state', 'run_id', 'show_sha256',
-      'sequence', 'simulation_time_usec', 'show_frame_index', 'error',
+      'sequence', 'simulation_time_usec', 'show_frame_index', 'show_time_usec', 'error',
     ]);
     if (Object.keys(message).some((key) => !allowed.has(key))) {
       throw new Error('status contains an unknown field');
@@ -62,6 +62,10 @@ export function validateMessage(message) {
     if (Object.hasOwn(message, 'show_frame_index')
       && (!Number.isSafeInteger(message.show_frame_index) || message.show_frame_index < 0)) {
       throw new Error('invalid show_frame_index');
+    }
+    if (Object.hasOwn(message, 'show_time_usec')
+      && (!Number.isSafeInteger(message.show_time_usec) || message.show_time_usec < 0)) {
+      throw new Error('invalid show_time_usec');
     }
     if (message.state === 'failed') {
       if (typeof message.error !== 'string' || message.error.length < 1 || message.error.length > 256) {

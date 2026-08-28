@@ -5,8 +5,8 @@ experiment:
   id: drone-fleet-single-host-mujoco-city-2
 
 scale:
-  drone_count: 200
-  process_count: 8
+  drone_count: 128
+  process_count: 6
 
 runtime:
   mode: native
@@ -26,6 +26,10 @@ global_wind:
     poll_interval_sec: 300
     timeout_sec: 5
     stale_after_sec: 900
+  scenario:
+    # Scenario mode is exclusive with browser Manual/Live input while enabled.
+    enabled: true
+    file: ../../examples/wind-scenarios/osaka-gust-east.json
 
 environment:
   mode: plateau

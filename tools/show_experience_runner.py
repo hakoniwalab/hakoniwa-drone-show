@@ -48,7 +48,7 @@ class ShowIrMotion:
 def _control_args(argv: list[str]) -> tuple[argparse.Namespace, list[str]]:
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("--wait-for-show-start", action="store_true")
-    parser.add_argument("--show-status-heartbeat-hz", type=float, default=1.0)
+    parser.add_argument("--show-status-heartbeat-hz", type=float, default=4.0)
     parser.add_argument(
         "--show-ir",
         type=Path,
@@ -59,11 +59,24 @@ def _control_args(argv: list[str]) -> tuple[argparse.Namespace, list[str]]:
         type=float,
         help="Optional safety cap for speeds resolved from Show IR frame times",
     )
+    parser.add_argument(
+        "--collision-evaluation-after-sec",
+        type=float,
+        help=(
+            "Capture collision counters and write the execution summary this many "
+            "seconds after the Show timeline starts"
+        ),
+    )
     args, remaining = parser.parse_known_args(argv)
     if not 0.1 <= args.show_status_heartbeat_hz <= 10.0:
         parser.error("--show-status-heartbeat-hz must be in [0.1, 10.0]")
     if args.show_ir_max_speed_m_s is not None and args.show_ir_max_speed_m_s <= 0:
         parser.error("--show-ir-max-speed-m-s must be positive")
+    if (
+        args.collision_evaluation_after_sec is not None
+        and args.collision_evaluation_after_sec < 0
+    ):
+        parser.error("--collision-evaluation-after-sec must be non-negative")
     return args, remaining
 
 
@@ -198,6 +211,69 @@ def _completed_success_future() -> Future:
     return future
 
 
+def collision_evaluation(
+    baseline: dict[str, int],
+    final: dict[str, int],
+    *,
+    baseline_simulation_time_usec: int | None,
+    final_simulation_time_usec: int | None,
+    baseline_errors: dict[str, str] | None = None,
+    final_errors: dict[str, str] | None = None,
+) -> dict[str, Any]:
+    """Summarize per-Drone MuJoCo contact-pair counter increments."""
+
+    baseline_errors = dict(baseline_errors or {})
+    final_errors = dict(final_errors or {})
+    all_names = sorted(
+        set(baseline) | set(final) | set(baseline_errors) | set(final_errors)
+    )
+    reset_detected: list[str] = []
+    per_drone: dict[str, dict[str, int | None]] = {}
+    valid_increments: list[int] = []
+    affected = 0
+    for name in all_names:
+        before = baseline.get(name)
+        after = final.get(name)
+        increment = None
+        if before is not None and after is not None:
+            if after < before:
+                reset_detected.append(name)
+            else:
+                increment = after - before
+                valid_increments.append(increment)
+                if increment > 0:
+                    affected += 1
+        per_drone[name] = {
+            "baseline": before,
+            "final": after,
+            "increment": increment,
+        }
+    missing = sorted(
+        name for name in all_names if name not in baseline or name not in final
+    )
+    return {
+        "metric": "DroneStatus.collided_counts contact-pair increments",
+        "scope": "after all takeoffs and before landing",
+        "baseline_simulation_time_usec": baseline_simulation_time_usec,
+        "final_simulation_time_usec": final_simulation_time_usec,
+        "complete": (
+            not missing
+            and not reset_detected
+            and not baseline_errors
+            and not final_errors
+        ),
+        "total_increment": sum(valid_increments),
+        "affected_drone_count": affected,
+        "max_drone_increment": max(valid_increments, default=0),
+        "valid_drone_count": len(valid_increments),
+        "missing_drones": missing,
+        "reset_detected_drones": reset_detected,
+        "baseline_errors": baseline_errors,
+        "final_errors": final_errors,
+        "per_drone": per_drone,
+    }
+
+
 def make_state_machine_class(base_module: ModuleType, hakopy: Any):
     class ShowExperienceStateMachine(base_module.AssetShowStateMachine):
         def __init__(self, args: argparse.Namespace) -> None:
@@ -231,6 +307,17 @@ def make_state_machine_class(base_module: ModuleType, hakopy: Any):
             )
             self.execution_released = not self.wait_for_show_start
             self.show_frame_index = 0 if self.show_ir is not None else None
+            self.show_timeline_start_simulation_usec: int | None = None
+            self.collision_baseline: dict[str, int] = {}
+            self.collision_final: dict[str, int] = {}
+            self.collision_baseline_errors: dict[str, str] = {}
+            self.collision_final_errors: dict[str, str] = {}
+            self.collision_baseline_simulation_time_usec: int | None = None
+            self.collision_final_simulation_time_usec: int | None = None
+            self.collision_evaluation_after_sec = getattr(
+                args, "collision_evaluation_after_sec", None
+            )
+            self.collision_evaluation_written = False
 
         def _initialize_show_ir_runtime(self, args: argparse.Namespace) -> None:
             """Initialize Drone PRO execution state without reading legacy show.json."""
@@ -334,6 +421,13 @@ def make_state_machine_class(base_module: ModuleType, hakopy: Any):
                         ),
                     )
                 )
+            phases.append(
+                base_module.Phase(
+                    name="collision-final",
+                    submit=self._capture_collision_final,
+                    on_complete=self._on_simple_complete("collision-final"),
+                )
+            )
             if self.args.land:
                 phases.append(
                     base_module.Phase(
@@ -348,10 +442,114 @@ def make_state_machine_class(base_module: ModuleType, hakopy: Any):
             if base_module.any_failed(results):
                 raise RuntimeError("takeoff failed")
             self.estimated_positions = self._initial_ir_positions()
+            (
+                self.collision_baseline,
+                self.collision_baseline_errors,
+            ) = self._read_collision_counts()
+            self.collision_baseline_simulation_time_usec = self._simulation_time()
+            print(
+                "INFO: collision_baseline "
+                f"drones={len(self.collision_baseline)} "
+                f"errors={len(self.collision_baseline_errors)}"
+            )
+            self._write_collision_baseline()
+            self.show_timeline_start_simulation_usec = self._simulation_time()
             hold_sec = self.ir_initial_hold_sec
             if not self.ir_motions and not self.args.land:
                 hold_sec += max(0.0, float(self.args.final_hold_extra_sec))
             self.hold_remaining_usec = int(max(0.0, hold_sec) * 1_000_000)
+
+        def _read_collision_counts(self) -> tuple[dict[str, int], dict[str, str]]:
+            counts: dict[str, int] = {}
+            errors: dict[str, str] = {}
+            if self.fleet is None:
+                return counts, {"*": "fleet is not initialized"}
+            for drone_id in self.drone_names:
+                try:
+                    status = self.fleet.clients[drone_id].get_status()
+                    value = int(status.collided_counts)
+                    if value < 0:
+                        raise ValueError("collided_counts is negative")
+                    counts[drone_id] = value
+                except Exception as exc:
+                    errors[drone_id] = str(exc)
+                    print(
+                        f"WARN: collision counter read failed drone={drone_id}: {exc}"
+                    )
+            return counts, errors
+
+        def _write_collision_baseline(self) -> None:
+            if getattr(self.args, "summary_json", None) is None:
+                return
+            summary_path = self.args.summary_json.resolve()
+            baseline_path = summary_path.with_name(
+                f"{summary_path.stem}.baseline{summary_path.suffix}"
+            )
+            payload = {
+                "schema_version": 1,
+                "status": "baseline_captured",
+                "run_id": self.run_id,
+                "show_sha256": self.show_sha256,
+                "simulation_time_usec": self.collision_baseline_simulation_time_usec,
+                "drone_count": len(self.drone_names),
+                "counts": self.collision_baseline,
+                "errors": self.collision_baseline_errors,
+            }
+            baseline_path.parent.mkdir(parents=True, exist_ok=True)
+            baseline_path.write_text(
+                json.dumps(payload, ensure_ascii=True, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            print(f"INFO: collision_baseline_written path={baseline_path}")
+
+        def _capture_collision_final(self) -> list[Any]:
+            self.collision_final, self.collision_final_errors = (
+                self._read_collision_counts()
+            )
+            self.collision_final_simulation_time_usec = self._simulation_time()
+            report = collision_evaluation(
+                self.collision_baseline,
+                self.collision_final,
+                baseline_simulation_time_usec=(
+                    self.collision_baseline_simulation_time_usec
+                ),
+                final_simulation_time_usec=self.collision_final_simulation_time_usec,
+                baseline_errors=self.collision_baseline_errors,
+                final_errors=self.collision_final_errors,
+            )
+            print(
+                "INFO: collision_final "
+                f"total_increment={report['total_increment']} "
+                f"affected_drones={report['affected_drone_count']} "
+                f"complete={str(report['complete']).lower()}"
+            )
+            return [_completed_success_future()]
+
+        def _capture_scheduled_collision_evaluation(self) -> None:
+            if (
+                self.collision_evaluation_written
+                or self.collision_evaluation_after_sec is None
+                or self.show_timeline_start_simulation_usec is None
+                or self.collision_baseline_simulation_time_usec is None
+                or getattr(self.args, "summary_json", None) is None
+            ):
+                return
+            show_elapsed_usec = (
+                self._simulation_time() - self.show_timeline_start_simulation_usec
+            )
+            evaluation_usec = int(
+                float(self.collision_evaluation_after_sec) * 1_000_000
+            )
+            if show_elapsed_usec < evaluation_usec:
+                return
+            self._capture_collision_final()
+            self.collision_evaluation_written = True
+            self._write_summary("evaluation_completed")
+            print(
+                "INFO: collision_evaluation_written "
+                f"after_sec={float(self.collision_evaluation_after_sec):.3f} "
+                f"path={self.args.summary_json.resolve()}"
+            )
 
         def _make_ir_goto_submit(self, motion: ShowIrMotion):
             targets = {
@@ -428,6 +626,11 @@ def make_state_machine_class(base_module: ModuleType, hakopy: Any):
         def _simulation_time(self) -> int:
             return max(0, int(hakopy.simulation_time()))
 
+        def _show_time(self, now_usec: int) -> int | None:
+            if self.show_timeline_start_simulation_usec is None:
+                return None
+            return max(0, now_usec - self.show_timeline_start_simulation_usec)
+
         def _publish_status(
             self,
             state: str,
@@ -455,6 +658,7 @@ def make_state_machine_class(base_module: ModuleType, hakopy: Any):
                 sequence=self.status_sequence,
                 simulation_time_usec=now,
                 show_frame_index=self.show_frame_index,
+                show_time_usec=self._show_time(now),
                 error=error,
             )
             # hakopy's native binding requires a mutable bytearray even though
@@ -533,6 +737,7 @@ def make_state_machine_class(base_module: ModuleType, hakopy: Any):
             if self.execution_wall_t0 is None:
                 self.begin_execution_timing()
             super().step_once()
+            self._capture_scheduled_collision_evaluation()
             if self.failed:
                 self._publish_status("failed", error="show runner failed", force=True)
             elif self.done:
@@ -558,6 +763,16 @@ def make_state_machine_class(base_module: ModuleType, hakopy: Any):
                 "path": str(self.show_ir_path),
                 "sha256": self.show_sha256,
             }
+            payload["collision_evaluation"] = collision_evaluation(
+                self.collision_baseline,
+                self.collision_final,
+                baseline_simulation_time_usec=(
+                    self.collision_baseline_simulation_time_usec
+                ),
+                final_simulation_time_usec=self.collision_final_simulation_time_usec,
+                baseline_errors=self.collision_baseline_errors,
+                final_errors=self.collision_final_errors,
+            )
             path.write_text(
                 json.dumps(payload, ensure_ascii=True, indent=2) + "\n",
                 encoding="utf-8",
@@ -582,6 +797,7 @@ def main(argv: list[str] | None = None) -> int:
     args.show_status_heartbeat_hz = control.show_status_heartbeat_hz
     args.show_ir = control.show_ir
     args.show_ir_max_speed_m_s = control.show_ir_max_speed_m_s
+    args.collision_evaluation_after_sec = control.collision_evaluation_after_sec
     runner_class = make_state_machine_class(base_module, hakopy)
     runner = runner_class(args)
 

@@ -613,7 +613,9 @@ def _global_wind_settings(experiment_path: Path) -> dict:
     value = raw.get("global_wind", {})
     if not isinstance(value, dict):
         raise base.RecipeError("global_wind must be a mapping")
-    unknown = sorted(set(value) - {"enabled", "initial_mode", "manual", "live"})
+    unknown = sorted(
+        set(value) - {"enabled", "initial_mode", "manual", "live", "scenario"}
+    )
     if unknown:
         raise base.RecipeError("global_wind has unknown fields: " + ", ".join(unknown))
     enabled = value.get("enabled", True)
@@ -687,6 +689,34 @@ def _global_wind_settings(experiment_path: Path) -> dict:
         live, "stale_after_sec", 900.0, poll_interval_sec, 86400.0,
         "global_wind.live",
     )
+    scenario = value.get("scenario", {})
+    if not isinstance(scenario, dict):
+        raise base.RecipeError("global_wind.scenario must be a mapping")
+    unknown_scenario = sorted(set(scenario) - {"enabled", "file"})
+    if unknown_scenario:
+        raise base.RecipeError(
+            "global_wind.scenario has unknown fields: "
+            + ", ".join(unknown_scenario)
+        )
+    scenario_enabled = scenario.get("enabled", False)
+    if not isinstance(scenario_enabled, bool):
+        raise base.RecipeError("global_wind.scenario.enabled must be boolean")
+    scenario_file = scenario.get("file")
+    scenario_path = None
+    scenario_sha256 = None
+    if scenario_enabled:
+        if not isinstance(scenario_file, str) or not scenario_file:
+            raise base.RecipeError(
+                "global_wind.scenario.file is required when scenario is enabled"
+            )
+        scenario_path = (experiment_path.parent / scenario_file).resolve()
+        try:
+            from tools.wind_scenario import load_wind_scenario
+
+            load_wind_scenario(scenario_path)
+        except (OSError, ValueError) as exc:
+            raise base.RecipeError(f"invalid global_wind.scenario.file: {exc}") from exc
+        scenario_sha256 = hashlib.sha256(scenario_path.read_bytes()).hexdigest()
     return {
         "enabled": enabled,
         "initial_mode": initial_mode,
@@ -696,6 +726,11 @@ def _global_wind_settings(experiment_path: Path) -> dict:
             "poll_interval_sec": poll_interval_sec,
             "timeout_sec": timeout_sec,
             "stale_after_sec": stale_after_sec,
+        },
+        "scenario": {
+            "enabled": scenario_enabled,
+            "path": str(scenario_path) if scenario_path is not None else None,
+            "sha256": scenario_sha256,
         },
     }
 
@@ -1385,6 +1420,9 @@ def _write_show_launcher(
             / "hakoniwa-ar-ca.crt"
         )
         public_ca.write_bytes(ar_tls["ca_certificate"].read_bytes())
+    wind_scenario = (
+        marker.get("drone_show", {}).get("global_wind", {}).get("scenario", {})
+    )
     return show_runtime.patch_launcher(
         launcher,
         show_runner=SHOW_ROOT / "tools" / "show_experience_runner.py",
@@ -1407,6 +1445,11 @@ def _write_show_launcher(
         ar_private_key=(ar_tls["server_key"] if ar_tls is not None else None),
         global_wind_asset=SHOW_ROOT / "tools" / "global_wind_asset.py",
         global_wind_endpoint_config=wind_endpoint_config,
+        global_wind_scenario_path=(
+            Path(wind_scenario["path"])
+            if wind_scenario.get("enabled") is True
+            else None
+        ),
         pdu_config_path=pdu_config_path,
     )
 

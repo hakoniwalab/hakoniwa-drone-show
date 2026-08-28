@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "scenario_id": "osaka-gust-east",
+  "seed": 12345,
+  "events": [
+    {
+      "time_sec": 0,
+      "enabled": true,
+      "speed_m_s": 0.0,
+      "direction_to_deg": 90
+    },
+    {
+      "time_sec": 15,
+      "enabled": true,
+      "speed_m_s": 4.0,
+      "direction_to_deg": 90
+    },
+    {
+      "time_sec": 30,
+      "enabled": true,
+      "speed_m_s": 8.0,
+      "direction_to_deg": 120
+    },
+    {
+      "time_sec": 36,
+      "enabled": true,
+      "speed_m_s": 4.0,
+      "direction_to_deg": 90
+    },
+    {
+      "time_sec": 42,
+      "enabled": true,
+      "speed_m_s": 0.0,
+      "direction_to_deg": 90
+    }
+  ],
+  "vehicle_variation": {
+    "type": "fixed_gain",
+    "speed_stddev_m_s": 0.32
+  }
+}

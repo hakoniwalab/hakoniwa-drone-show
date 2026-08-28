@@ -179,6 +179,21 @@ Open-Meteo気象モデル値を既定5分間隔で取得し、気象風向（fro
 変換します。`最新値を取得`で即時更新でき、取得に使用したAPI URLも画面から確認できます。
 Liveでも機体ごとの風速標準偏差は変更可能です。gustは参考表示だけに使用します。
 
+再現実験ではCity experimentの`global_wind.scenario.enabled`を`true`にし、
+`global_wind.scenario.file`へWind Scenario v1 JSONを指定してから`configure`します。
+Scenarioは離陸完了を0秒とする箱庭時刻で進み、ブラウザのManual／Live入力より優先されます。
+実行中は現在イベントの方向、平均風速、標準偏差が風コンパスへ自動表示されます。
+サンプルは[`examples/wind-scenarios/osaka-gust-east.json`](examples/wind-scenarios/osaka-gust-east.json)、
+設定項目と戻し方は
+[`docs/virtual-drone-show-city-config.md`](docs/virtual-drone-show-city-config.md)を参照してください。
+
+Show Runnerは全機takeoff完了直後の`DroneStatus.collided_counts`をbaselineとして即時保存し、
+Wind Scenarioの最終イベントから10秒後の値をfinalとして取得します。baselineは
+`work/recipes/drone-fleet-single-host/validation/execution-summary.baseline.json`、差分集計は
+`work/recipes/drone-fleet-single-host/validation/execution-summary.json`に
+`collision_evaluation`として保存されます。この値はMuJoCoの新規contact geom pair数であり、
+事故件数や建物だけの接触回数を意味しません。
+
 Live WeatherデモはOpen-Meteo Free APIを利用します。Free APIの利用条件とrate limitは
 Open-Meteoの現行Termsに従い、Weather dataはOpen-Meteoへの帰属表示を伴います。この機能は
 気象モデル由来の値をシミュレーション表示へ用いるもので、実飛行・航空気象・安全判断には

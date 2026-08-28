@@ -136,7 +136,7 @@ def validate_message(message: Any) -> dict[str, Any]:
             "sequence",
             "simulation_time_usec",
         }
-        allowed = required | {"error", "show_frame_index"}
+        allowed = required | {"error", "show_frame_index", "show_time_usec"}
         fields = set(message)
         if not required <= fields or not fields <= allowed:
             raise ProtocolError("status contains missing or unknown fields")
@@ -158,6 +158,13 @@ def validate_message(message: Any) -> dict[str, Any]:
             or show_frame_index < 0
         ):
             raise ProtocolError("show_frame_index must be a non-negative integer")
+        show_time_usec = message.get("show_time_usec")
+        if "show_time_usec" in message and (
+            isinstance(show_time_usec, bool)
+            or not isinstance(show_time_usec, int)
+            or show_time_usec < 0
+        ):
+            raise ProtocolError("show_time_usec must be a non-negative integer")
         if state == "failed":
             if not isinstance(error, str) or not error or len(error) > 256:
                 raise ProtocolError("failed status requires an error of 1..256 characters")
@@ -192,6 +199,7 @@ def show_status(
     sequence: int,
     simulation_time_usec: int,
     show_frame_index: int | None = None,
+    show_time_usec: int | None = None,
     error: str | None = None,
 ) -> dict[str, Any]:
     message: dict[str, Any] = {
@@ -206,6 +214,8 @@ def show_status(
     }
     if show_frame_index is not None:
         message["show_frame_index"] = show_frame_index
+    if show_time_usec is not None:
+        message["show_time_usec"] = show_time_usec
     if error is not None:
         message["error"] = error[:256]
     return validate_message(message)

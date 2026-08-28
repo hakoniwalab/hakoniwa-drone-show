@@ -853,6 +853,11 @@ scenario:
                             "timeout_sec": 5.0,
                             "stale_after_sec": 900.0,
                         },
+                        "scenario": {
+                            "enabled": False,
+                            "path": None,
+                            "sha256": None,
+                        },
                     },
                     "show_definition": {
                         "path": str(

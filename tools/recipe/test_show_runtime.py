@@ -111,6 +111,10 @@ class ShowRuntimeTest(unittest.TestCase):
             write_json(
                 launcher_path,
                 {"assets": [
+                    {
+                        "name": "drone-service-1",
+                        "args": ["fleet.json", "pdu.json", "--asset-name", "drone-1"],
+                    },
                     {"name": "show-runner", "args": ["old.py", "--show-json", "show.json"], "env": {"set": {"KEEP": "1"}}},
                     {"name": "web-bridge-fleets", "args": ["--config-root", "old", "--node-name", "node"]},
                     {"name": "visual-state-publisher", "args": ["vsp.json"]},
@@ -153,6 +157,22 @@ class ShowRuntimeTest(unittest.TestCase):
             )
             self.assertEqual(assets["web-bridge-fleets"]["args"][1], str((root / "bridge").resolve()))
             self.assertEqual(assets["visual-state-publisher"]["args"], ["vsp.json"])
+            self.assertEqual(
+                assets["show-runner"]["readiness"]["asset_name"],
+                "ShowRunnerAsset",
+            )
+            self.assertEqual(
+                assets["visual-state-publisher"]["readiness"]["asset_name"],
+                "DroneVisualStatePublisher",
+            )
+            self.assertEqual(
+                assets["web-bridge-fleets"]["readiness"]["asset_name"],
+                "WebBridge",
+            )
+            self.assertEqual(
+                assets["drone-service-1"]["readiness"]["asset_name"],
+                "drone-1",
+            )
 
     def test_launcher_adds_global_wind_asset(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -177,6 +197,16 @@ class ShowRuntimeTest(unittest.TestCase):
             pdu_config = root / "pdudef.json"
             for path in (runner, wind_asset_path, endpoint, pdu_config):
                 path.touch()
+            scenario = root / "wind-scenario.json"
+            write_json(
+                scenario,
+                {
+                    "events": [
+                        {"time_sec": 0},
+                        {"time_sec": 42},
+                    ]
+                },
+            )
             show_runtime.patch_launcher(
                 launcher_path,
                 show_runner=runner,
@@ -184,6 +214,7 @@ class ShowRuntimeTest(unittest.TestCase):
                 bridge_config_root=root / "bridge",
                 global_wind_asset=wind_asset_path,
                 global_wind_endpoint_config=endpoint,
+                global_wind_scenario_path=scenario,
                 pdu_config_path=pdu_config,
             )
             assets = {
@@ -195,7 +226,19 @@ class ShowRuntimeTest(unittest.TestCase):
             self.assertEqual(wind["depends_on"], ["web-bridge-fleets"])
             self.assertIn(str(endpoint.resolve()), wind["args"])
             self.assertIn(str(pdu_config.resolve()), wind["args"])
+            self.assertEqual(
+                wind["args"][-2:], ["--scenario", str(scenario.resolve())]
+            )
+            evaluation_index = assets["show-runner"]["args"].index(
+                "--collision-evaluation-after-sec"
+            )
+            self.assertEqual(
+                assets["show-runner"]["args"][evaluation_index + 1], "52.0"
+            )
             self.assertEqual(assets["show-runner"]["depends_on"], ["global-wind-asset"])
+            self.assertEqual(
+                wind["readiness"]["asset_name"], "GlobalWindAsset"
+            )
 
     def test_global_wind_asset_config_uses_shm_callback(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -315,6 +358,27 @@ class ShowRuntimeTest(unittest.TestCase):
                 embedded / "config" / "visual.json",
                 {"paths": [], "robots": []},
             )
+            wind_scenario = root / "wind-scenario-source.json"
+            write_json(
+                wind_scenario,
+                {
+                    "schema_version": 1,
+                    "scenario_id": "test-wind",
+                    "seed": 1,
+                    "events": [
+                        {
+                            "time_sec": 0,
+                            "enabled": True,
+                            "speed_m_s": 0.0,
+                            "direction_to_deg": 0.0,
+                        }
+                    ],
+                    "vehicle_variation": {
+                        "type": "fixed_gain",
+                        "speed_stddev_m_s": 0.0,
+                    },
+                },
+            )
             marker = root / "marker.json"
             write_json(
                 marker,
@@ -377,6 +441,27 @@ class ShowRuntimeTest(unittest.TestCase):
                                 "device_orientation": "optional",
                             },
                         },
+                        "global_wind": {
+                            "enabled": True,
+                            "initial_mode": "manual",
+                            "manual": {
+                                "enabled": False,
+                                "speed_m_s": 0.0,
+                                "direction_to_deg": 0.0,
+                                "speed_stddev_m_s": 0.0,
+                            },
+                            "live": {
+                                "provider": "open-meteo",
+                                "poll_interval_sec": 300.0,
+                                "timeout_sec": 5.0,
+                                "stale_after_sec": 900.0,
+                            },
+                            "scenario": {
+                                "enabled": True,
+                                "path": str(wind_scenario),
+                                "sha256": show_runtime._sha256(wind_scenario),
+                            },
+                        },
                     },
                     "city_world": {
                         "origin": {
@@ -398,6 +483,10 @@ class ShowRuntimeTest(unittest.TestCase):
             )
 
             self.assertEqual((destination / "show-ir.json").read_bytes(), show_ir.read_bytes())
+            self.assertEqual(
+                (destination / "wind-scenario.json").read_bytes(),
+                wind_scenario.read_bytes(),
+            )
             runtime = json.loads((destination / "runtime-config.json").read_text())
             viewer = json.loads(
                 (
@@ -442,6 +531,14 @@ class ShowRuntimeTest(unittest.TestCase):
                     "latitude": 35.0,
                     "longitude": 138.0,
                     "source": "plateau-city-world",
+                },
+            )
+            self.assertEqual(
+                runtime["global_wind"]["scenario"],
+                {
+                    "enabled": True,
+                    "url": "./wind-scenario.json",
+                    "sha256": show_runtime._sha256(wind_scenario),
                 },
             )
             self.assertEqual(

@@ -157,12 +157,20 @@ UI操作中も同じ値を連続送信せず、確定値が変わった場合だ
 外部APIのレスポンスやデータを本リポジトリへ恒久保存・再配布する場合は、別途ライセンスを
 確認する。
 
-### Reproducible scenario（将来）
+### Reproducible scenario
 
 Live weatherはデモ時刻によって結果が変わるため、AWARDの比較デモには再現可能な風シナリオも
 必要になる。箱庭仮想時刻を基準に「無風 → 定常風 → 突風 → 無風」を再生し、同じShow IRで
-結果を比較できる形式を将来追加する。Manual/Liveと同じGlobal Wind JSONを出力するproducerとし、
-Global Wind Asset側へ入力モード固有処理を持ち込まない。
+結果を比較できる形式を追加した。Manual/Liveと同じGlobal Wind JSONを出力し、Global Wind Assetが
+`show_time_usec`からイベントを解決する。Scenario有効時はManual/Live入力を無視し、ブラウザは
+同じScenarioと箱庭時刻から現在の風向・風速・標準偏差をコンパスへ表示する。
+
+- [x] Wind Scenario v1 schema、validator、固定seedを追加する
+- [x] 全機takeoff完了を0秒とする箱庭時刻でイベントを再生する
+- [x] 変更イベントだけを全機へfan-outする
+- [x] Scenario実行中のManual／Live入力を無効化する
+- [x] 現在イベントをブラウザの風コンパスへ表示する
+- [ ] Hakoniwa reset後の先頭イベント再適用をruntimeで確認する
 
 ## 責務境界
 

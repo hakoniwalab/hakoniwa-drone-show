@@ -94,6 +94,22 @@ class FleetMujocoError(RuntimeError):
     pass
 
 
+def _disable_runtime_csv_logging(type_config: dict[str, Any]) -> None:
+    """Disable per-drone CSV logging in generated Drone Show configurations."""
+    simulation = type_config.get("simulation")
+    if not isinstance(simulation, dict):
+        raise FleetMujocoError("MuJoCo Drone type config has no simulation object")
+    logging = simulation.get("logging")
+    if logging is None:
+        logging = {}
+        simulation["logging"] = logging
+    if not isinstance(logging, dict):
+        raise FleetMujocoError(
+            "MuJoCo Drone type config simulation.logging must be an object"
+        )
+    logging["mode"] = "none"
+
+
 def _validate_spawn_spacing(spawn_spacing_m: float) -> float:
     value = float(spawn_spacing_m)
     if (
@@ -1212,6 +1228,7 @@ def materialize_fleet_config(
     type_output.parent.mkdir(parents=True, exist_ok=True)
     type_config = json.loads(type_source.read_text(encoding="utf-8"))
     type_config["name"] = "api-mujoco-city"
+    _disable_runtime_csv_logging(type_config)
     dynamics = type_config["components"]["droneDynamics"]
     dynamics["enable_disturbance"] = True
     dynamics["mujoco"]["modelPath"] = str(model_path)
@@ -1602,6 +1619,7 @@ def materialize_flat_fleet_config(
     type_output.parent.mkdir(parents=True, exist_ok=True)
     type_config = json.loads(source_type.read_text(encoding="utf-8"))
     type_config["name"] = "api-mujoco-flat"
+    _disable_runtime_csv_logging(type_config)
     dynamics = type_config["components"]["droneDynamics"]
     dynamics["enable_disturbance"] = True
     dynamics["mujoco"]["modelPath"] = str(

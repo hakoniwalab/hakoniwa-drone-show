@@ -56,6 +56,20 @@ def generate_xml(scene, drone, count):
         )
         return drone_root
 
+    def test_drone_show_generated_type_disables_csv_logging(self) -> None:
+        type_config = {
+            "simulation": {
+                "logging": {"mode": "csv", "existing_option": True},
+            }
+        }
+
+        recipe._disable_runtime_csv_logging(type_config)
+
+        self.assertEqual(type_config["simulation"]["logging"]["mode"], "none")
+        self.assertTrue(
+            type_config["simulation"]["logging"]["existing_option"]
+        )
+
     def test_base_fleet_has_deterministic_names_and_collision_mask(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

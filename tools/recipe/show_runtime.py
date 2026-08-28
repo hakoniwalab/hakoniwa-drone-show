@@ -41,6 +41,28 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def wind_scenario_evaluation_after_sec(
+    scenario_path: Path, *, grace_sec: float = 10.0
+) -> float:
+    """Return the Show-relative collision evaluation deadline."""
+    scenario = _read_json(scenario_path.resolve())
+    events = scenario.get("events") if isinstance(scenario, dict) else None
+    if not isinstance(events, list) or not events:
+        raise ShowRuntimeError("Global Wind Scenario has no events")
+    try:
+        final_event_sec = max(float(event["time_sec"]) for event in events)
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ShowRuntimeError("Global Wind Scenario event time is invalid") from exc
+    if (
+        not math.isfinite(final_event_sec)
+        or final_event_sec < 0.0
+        or not math.isfinite(grace_sec)
+        or grace_sec < 0.0
+    ):
+        raise ShowRuntimeError("Global Wind Scenario evaluation time is invalid")
+    return final_event_sec + grace_sec
+
+
 def required_show_ir_speed_m_s(
     show_ir_path: Path, *, initial_altitude_m: float
 ) -> float:
@@ -686,6 +708,46 @@ def materialize_browser(
     destination = web_root / "drone-show"
     shutil.copytree(show_root / "web", destination, dirs_exist_ok=True)
     shutil.copy2(show_ir_path, destination / "show-ir.json")
+    global_wind_source = show_config.get(
+        "global_wind",
+        {
+            "enabled": True,
+            "initial_mode": "manual",
+            "manual": {
+                "enabled": False,
+                "speed_m_s": 0.0,
+                "direction_to_deg": 0.0,
+                "speed_stddev_m_s": 0.0,
+            },
+            "live": {
+                "provider": "open-meteo",
+                "poll_interval_sec": 300.0,
+                "timeout_sec": 5.0,
+                "stale_after_sec": 900.0,
+            },
+        },
+    )
+    global_wind_runtime = dict(global_wind_source)
+    scenario_source = global_wind_source.get("scenario", {})
+    scenario_runtime = {"enabled": False, "url": None, "sha256": None}
+    if isinstance(scenario_source, dict) and scenario_source.get("enabled") is True:
+        scenario_path_value = scenario_source.get("path")
+        if not isinstance(scenario_path_value, str):
+            raise ShowRuntimeError("enabled Global Wind Scenario has no source path")
+        scenario_path = Path(scenario_path_value).resolve()
+        if not scenario_path.is_file():
+            raise ShowRuntimeError(f"Global Wind Scenario does not exist: {scenario_path}")
+        scenario_sha256 = _sha256(scenario_path)
+        configured_sha256 = scenario_source.get("sha256")
+        if configured_sha256 is not None and configured_sha256 != scenario_sha256:
+            raise ShowRuntimeError("Global Wind Scenario hash changed after configure")
+        shutil.copy2(scenario_path, destination / "wind-scenario.json")
+        scenario_runtime = {
+            "enabled": True,
+            "url": "./wind-scenario.json",
+            "sha256": scenario_sha256,
+        }
+    global_wind_runtime["scenario"] = scenario_runtime
     runtime_config = {
         "schema_version": 1,
         "threejs_root": "/thirdparty/hakoniwa-threejs-drone",
@@ -727,25 +789,7 @@ def materialize_browser(
             "robot_name": wind_protocol.ROBOT_NAME,
             "command_pdu_name": wind_protocol.COMMAND_PDU_NAME,
             "frame_size": wind_protocol.FRAME_SIZE,
-            **show_config.get(
-                "global_wind",
-                {
-                    "enabled": True,
-                    "initial_mode": "manual",
-                    "manual": {
-                        "enabled": False,
-                        "speed_m_s": 0.0,
-                        "direction_to_deg": 0.0,
-                        "speed_stddev_m_s": 0.0,
-                    },
-                    "live": {
-                        "provider": "open-meteo",
-                        "poll_interval_sec": 300.0,
-                        "timeout_sec": 5.0,
-                        "stale_after_sec": 900.0,
-                    },
-                },
-            ),
+            **global_wind_runtime,
             "venue": {
                 "latitude": float(origin["latitude"]),
                 "longitude": float(origin["longitude"]),
@@ -833,6 +877,7 @@ def patch_launcher(
     ar_private_key: Path | None = None,
     global_wind_asset: Path | None = None,
     global_wind_endpoint_config: Path | None = None,
+    global_wind_scenario_path: Path | None = None,
     pdu_config_path: Path | None = None,
 ) -> Path:
     launcher = _read_json(launcher_path.resolve())
@@ -860,6 +905,9 @@ def patch_launcher(
     while "--show-ir-max-speed-m-s" in args:
         index = args.index("--show-ir-max-speed-m-s")
         del args[index : index + 2]
+    while "--collision-evaluation-after-sec" in args:
+        index = args.index("--collision-evaluation-after-sec")
+        del args[index : index + 2]
     if show_ir_path is not None:
         args.extend(["--show-ir", str(show_ir_path.resolve())])
         if show_ir_max_speed_m_s is not None:
@@ -873,6 +921,10 @@ def patch_launcher(
             )
     environment = runner.setdefault("env", {}).setdefault("set", {})
     environment["HAKO_DRONE_ROOT"] = str(drone_root.resolve())
+    runner["readiness"] = {
+        "type": "hako_asset",
+        "asset_name": "ShowRunnerAsset",
+    }
 
     if global_wind_asset is not None:
         asset_path = global_wind_asset.resolve()
@@ -902,7 +954,24 @@ def patch_launcher(
             "cwd": str(asset_path.parent.parent),
             "depends_on": list(runner.get("depends_on", [])),
             "delay_sec": 1,
+            "readiness": {
+                "type": "hako_asset",
+                "asset_name": "GlobalWindAsset",
+            },
         }
+        if global_wind_scenario_path is not None:
+            scenario_path = global_wind_scenario_path.resolve()
+            if not scenario_path.is_file():
+                raise ShowRuntimeError(
+                    f"Global Wind Scenario does not exist: {scenario_path}"
+                )
+            wind_asset["args"].extend(["--scenario", str(scenario_path)])
+            args.extend(
+                [
+                    "--collision-evaluation-after-sec",
+                    str(wind_scenario_evaluation_after_sec(scenario_path)),
+                ]
+            )
         assets[:] = [
             asset for asset in assets if asset.get("name") != wind_asset["name"]
         ]
@@ -965,5 +1034,34 @@ def patch_launcher(
         }
         assets[:] = [asset for asset in assets if asset.get("name") != gateway["name"]]
         assets.append(gateway)
+
+    # Registration readiness is opt-in. Processes such as the HTTP server and
+    # AR gateway do not register as Hakoniwa assets and intentionally retain
+    # the launcher's existing process-liveness behavior.
+    for asset in assets:
+        name = asset.get("name")
+        asset_args = asset.get("args")
+        if (
+            isinstance(name, str)
+            and name.startswith("drone-service-")
+            and isinstance(asset_args, list)
+            and "--asset-name" in asset_args
+        ):
+            name_index = asset_args.index("--asset-name") + 1
+            if name_index < len(asset_args):
+                asset["readiness"] = {
+                    "type": "hako_asset",
+                    "asset_name": str(asset_args[name_index]),
+                }
+        elif name == "visual-state-publisher":
+            asset["readiness"] = {
+                "type": "hako_asset",
+                "asset_name": "DroneVisualStatePublisher",
+            }
+        elif name == "web-bridge-fleets":
+            asset["readiness"] = {
+                "type": "hako_asset",
+                "asset_name": "WebBridge",
+            }
     _write_json(launcher_path, launcher)
     return launcher_path

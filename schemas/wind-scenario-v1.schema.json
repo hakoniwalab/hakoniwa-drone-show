@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Hakoniwa Drone Show Wind Scenario v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "scenario_id", "seed", "events", "vehicle_variation"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "scenario_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+    },
+    "seed": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
+    "events": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["time_sec", "enabled", "speed_m_s", "direction_to_deg"],
+        "properties": {
+          "time_sec": {"type": "number", "minimum": 0, "maximum": 86400},
+          "enabled": {"type": "boolean"},
+          "speed_m_s": {"type": "number", "minimum": 0, "maximum": 100},
+          "direction_to_deg": {"type": "number", "minimum": 0, "exclusiveMaximum": 360}
+        }
+      }
+    },
+    "vehicle_variation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "speed_stddev_m_s"],
+      "properties": {
+        "type": {"const": "fixed_gain"},
+        "speed_stddev_m_s": {"type": "number", "minimum": 0, "maximum": 100}
+      }
+    }
+  }
+}
