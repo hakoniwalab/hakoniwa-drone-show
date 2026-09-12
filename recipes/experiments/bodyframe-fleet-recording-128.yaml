@@ -1,0 +1,36 @@
+version: 1
+
+experiment:
+  id: drone-fleet-bodyframe-recording-128
+
+# This is the 128-UAV / 8-process condition selected by the Business Pack
+# multi-process performance experiment.  It intentionally remains BodyFrame;
+# no MuJoCo world or MJCF model is generated for this recording profile.
+scale:
+  drone_count: 128
+  drones_per_process: auto
+  process_count: 8
+
+runtime:
+  mode: native
+  visualization: true
+  show_runner_real_time_sync: true
+
+# Keep the measured HAKONIWA trajectory parameters.  The browser START gate
+# delays only the beginning of this scenario; it does not change it.
+scenario:
+  type: hakoniwa-word
+  word: HAKONIWA
+  letter_width_m: 2.0
+  letter_height_m: 4.0
+  letter_gap_m: 0.9
+  altitude_m: 4.0
+  duration_sec: 6.0
+  hold_sec: 0.0
+  speed_m_s: 0.5
+  timeout_sec: 120.0
+  land: false
+
+results:
+  enabled: false
+  directory: results
