@@ -18,6 +18,12 @@ SPEC.loader.exec_module(recipe)
 
 
 class FleetMujocoCityTest(unittest.TestCase):
+    def test_city_position_converts_to_fleet_ned(self) -> None:
+        self.assertEqual(
+            recipe._city_position_to_fleet_ned(5.0, -45.0, 7.0),
+            [5.0, 45.0, -7.0],
+        )
+
     def _fake_drone_root(self, root: Path) -> Path:
         drone_root = root / "hakoniwa-drone-pro"
         types = drone_root / "config" / "drone" / "fleets" / "types"
@@ -429,6 +435,33 @@ def generate_xml(scene, drone, count):
             recipe._partition_drone_ids(10, 3),
             [[1, 2, 3], [4, 5, 6], [7, 8, 9, 10]],
         )
+
+    def test_single_drone_city_show_uses_compatibility_point(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            scenario = Path(temporary)
+            formations = scenario / "formations"
+            formations.mkdir()
+            word = formations / "formation-HAKONIWA.json"
+            word.write_text(json.dumps({"points": [[0.0, 0.0, 0.0]]}))
+            show_path = scenario / "show.json"
+            show = {
+                "formation_files": [
+                    {"id": "HAKONIWA", "path": "formations/formation-HAKONIWA.json"}
+                ],
+                "timeline": [
+                    {"formation": "HAKONIWA", "duration_sec": 1.0, "hold_sec": 0.0}
+                ],
+            }
+            recipe._materialize_three_phase_city_show(
+                show, show_path=show_path, drone_count=1
+            )
+            self.assertEqual(len(show["formation_files"]), 3)
+            for entry in show["formation_files"]:
+                payload = json.loads(
+                    (scenario / entry["path"]).read_text(encoding="utf-8")
+                )
+                self.assertEqual(payload["points"], [[0.0, 0.0, 0.0]])
+                self.assertEqual(payload["derived_from"], "single-drone-city-checkpoint")
 
     def test_base_fleet_can_keep_only_global_ids_for_one_process(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

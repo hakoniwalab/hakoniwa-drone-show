@@ -124,6 +124,13 @@ def _validate_spawn_spacing(spawn_spacing_m: float) -> float:
     return value
 
 
+def _city_position_to_fleet_ned(
+    x_m: float, y_m: float, altitude_m: float
+) -> list[float]:
+    """Convert City/MuJoCo local XYZ to Drone Core's NED position contract."""
+    return [float(x_m), -float(y_m), -float(altitude_m)]
+
+
 def _resolve_launch_area(
     launch_area: dict[str, Any] | None,
 ) -> tuple[str, tuple[float, float, float], float]:
@@ -719,17 +726,27 @@ def _materialize_three_phase_city_show(
     word_short_span = min(_point_span(word_points, 0), _point_span(word_points, 1))
 
     target_span = max(word_short_span * 2.0, word_long_span * 0.55)
-    specifications = (
-        ("CHIIKAWA", _chiikawa_picture(drone_count), "generated-chiikawa-face"),
-        ("HACHIWARE", _hachiware_picture(drone_count), "generated-hachiware-face"),
-        ("USAGI", _usagi_picture(drone_count), "generated-usagi-face"),
-    )
+    if drone_count == 1:
+        # A one-vehicle Fleet is a useful City integration checkpoint even
+        # though it cannot draw a multi-outline character. Preserve the one
+        # generated point for each compatibility phase; the caller may replace
+        # the Show runner with direct Fleet RPC control.
+        specifications = tuple(
+            (formation_id, [[0.0, 0.0, 0.0]], "single-drone-city-checkpoint")
+            for formation_id in ("CHIIKAWA", "HACHIWARE", "USAGI")
+        )
+    else:
+        specifications = (
+            ("CHIIKAWA", _chiikawa_picture(drone_count), "generated-chiikawa-face"),
+            ("HACHIWARE", _hachiware_picture(drone_count), "generated-hachiware-face"),
+            ("USAGI", _usagi_picture(drone_count), "generated-usagi-face"),
+        )
     generated_entries = []
     for formation_id, sampled, source_description in specifications:
         source_span = max(_point_span(sampled, 0), _point_span(sampled, 1))
-        if source_span <= 0.0:
+        if source_span <= 0.0 and drone_count != 1:
             raise FleetMujocoError(f"formation template has zero span: {formation_id}")
-        scale = target_span / source_span
+        scale = target_span / source_span if source_span > 0.0 else 1.0
         for point in sampled:
             point[0] *= scale
             point[1] *= scale
@@ -1330,7 +1347,12 @@ def materialize_fleet_config(
                 search_radius_m=launch_search_radius_m,
             )
         targets = _formation_targets(show, show_path=show_path)
-        if not targets:
+        if drone_count == 1:
+            # The single-Drone City checkpoint is controlled directly through
+            # Fleet RPC. Its clearance route starts at the resolved launch
+            # point rather than at the compatibility Show point at city origin.
+            targets = [(item["x_m"], item["y_m"]) for item in spawn_points]
+        elif not targets:
             targets = [(item["x_m"], item["y_m"]) for item in spawn_points]
         route_points = _formation_clearance_points(targets)
         print(
@@ -1365,7 +1387,9 @@ def materialize_fleet_config(
         local_z_m = (
             spawn["surface_height_m"] + spawn_altitude_m + launch_offset_m[2]
         )
-        drone["position_meter"] = [spawn["x_m"], spawn["y_m"], -local_z_m]
+        drone["position_meter"] = _city_position_to_fleet_ned(
+            spawn["x_m"], spawn["y_m"], local_z_m
+        )
         spawn["body_origin_height_m"] = local_z_m
     fleet.write_text(json.dumps(fleet_config, indent=2) + "\n", encoding="utf-8")
     options["base_alt"] = flight_altitude_m
@@ -1677,7 +1701,9 @@ def materialize_flat_fleet_config(
         raise FleetMujocoError("generated flat fleet drone count is invalid")
     spawn_points = []
     for drone, (x_m, y_m) in zip(drones, candidates):
-        drone["position_meter"] = [x_m, y_m, -body_origin_height_m]
+        drone["position_meter"] = _city_position_to_fleet_ned(
+            x_m, y_m, body_origin_height_m
+        )
         spawn_points.append(
             {
                 "x_m": x_m,
