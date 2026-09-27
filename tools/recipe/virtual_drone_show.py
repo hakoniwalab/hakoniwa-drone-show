@@ -764,7 +764,7 @@ def _viewer_settings(experiment_path: Path) -> dict:
     network = viewer.get("network", {})
     if not isinstance(network, dict):
         raise base.RecipeError("viewer.network must be a mapping")
-    unknown_network = sorted(set(network) - {"host"})
+    unknown_network = sorted(set(network) - {"host", "websocket_port"})
     if unknown_network:
         raise base.RecipeError(
             "viewer.network has unknown fields: " + ", ".join(unknown_network)
@@ -778,9 +778,16 @@ def _viewer_settings(experiment_path: Path) -> dict:
         raise base.RecipeError(
             "viewer.network.host must be an IPv4 address"
         ) from exc
+    websocket_port = network.get("websocket_port", show_runtime.DEFAULT_WEBSOCKET_PORT)
+    if (
+        not isinstance(websocket_port, int)
+        or isinstance(websocket_port, bool)
+        or not 1 <= websocket_port <= 65535
+    ):
+        raise base.RecipeError("viewer.network.websocket_port must be a port number")
     settings = {
         "initial_mode": initial_mode,
-        "network": {"host": resolved_host},
+        "network": {"host": resolved_host, "websocket_port": websocket_port},
     }
     led_appearance = viewer.get("led_appearance")
     if led_appearance is not None:
@@ -1394,9 +1401,16 @@ def _write_show_launcher(
         paths.recipe_config / "global-wind-asset",
         pdu_def_path=pdu_config_path,
     )
+    websocket_port = (
+        marker.get("drone_show", {})
+        .get("viewer", {})
+        .get("network", {})
+        .get("websocket_port", show_runtime.DEFAULT_WEBSOCKET_PORT)
+    )
     bridge_root = show_runtime.materialize_bridge_config(
         base.bridge_config_root(paths),
         paths.recipe_config / "web-bridge-drone-show",
+        websocket_port=websocket_port,
     )
     show_runtime.materialize_browser(
         show_root=SHOW_ROOT,
@@ -1428,6 +1442,7 @@ def _write_show_launcher(
         show_runner=SHOW_ROOT / "tools" / "show_experience_runner.py",
         drone_root=drone_root,
         bridge_config_root=bridge_root,
+        websocket_port=websocket_port,
         no_cache_http_server=SHOW_ROOT / "tools" / "no_cache_http_server.py",
         show_ir_path=paths.recipe_config
         / "scenario"

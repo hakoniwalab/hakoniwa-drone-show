@@ -17,6 +17,16 @@ from tools.svg_to_formation import SvgConversionError, convert_svg
 
 
 SHOW_PDUTYPES_ID = "drone_show_control_type"
+# The fleet WebBridge WebSocket port unless viewer.network.websocket_port sets
+# another (8765 can be taken on the host, e.g. by a WSL port proxy).
+DEFAULT_WEBSOCKET_PORT = 8765
+# Registering a large fleet's PDU channels takes well over the Launcher's
+# default 30 s on Windows; the Urban one-Drone route uses the same bound.
+READINESS_TIMEOUT_SEC = 180
+# One `hako-cmd ls` probe waits this long for the master lock, which a busy
+# Drone service holds often; the Launcher default of 1 s misses registrations.
+READINESS_PROBE_TIMEOUT_SEC = 10
+BRIDGE_WEBSOCKET_SERVER = Path("comm") / "visual-state-websocket-server.json"
 SHOW_PDUTYPES_FILE = "drone-show-control-pdutypes.json"
 SHOW_BRIDGE_PDUDEF_FILE = "drone-show-visual-state.json"
 
@@ -381,8 +391,13 @@ def extend_asset_pdudef(pdu_def_path: Path) -> Path:
     return pdu_def_path
 
 
-def materialize_bridge_config(base_root: Path, output_root: Path) -> Path:
-    """Copy the installed fleet bridge and add Show command/status routes."""
+def materialize_bridge_config(
+    base_root: Path,
+    output_root: Path,
+    *,
+    websocket_port: int = DEFAULT_WEBSOCKET_PORT,
+) -> Path:
+    """Copy the installed fleet bridge, set its port, and add Show routes."""
 
     base_root = base_root.resolve()
     output_root = output_root.resolve()
@@ -398,6 +413,11 @@ def materialize_bridge_config(base_root: Path, output_root: Path) -> Path:
             + ", ".join(str(path) for path in missing)
         )
     shutil.copytree(base_root, output_root, dirs_exist_ok=True)
+    server_path = output_root / BRIDGE_WEBSOCKET_SERVER
+    if server_path.is_file():
+        server = _read_json(server_path)
+        server.setdefault("local", {})["port"] = int(websocket_port)
+        _write_json(server_path, server)
 
     pdu_dir = output_root / "pdu"
     _write_json(pdu_dir / SHOW_PDUTYPES_FILE, show_pdutypes())
@@ -638,6 +658,7 @@ def materialize_browser(
     audience = viewer_settings.get("audience_camera")
     network = viewer_settings.get("network", {"host": "127.0.0.1"})
     websocket_host = network.get("host", "127.0.0.1")
+    websocket_port = int(network.get("websocket_port", DEFAULT_WEBSOCKET_PORT))
     led_appearance = viewer_settings.get(
         "led_appearance",
         {"scale": 1.45, "intensity": 1.25, "spatial_depth_cue": False},
@@ -752,7 +773,7 @@ def materialize_browser(
         "schema_version": 1,
         "threejs_root": "/thirdparty/hakoniwa-threejs-drone",
         "viewer_config_name": "viewer-config-fleets.json",
-        "websocket_url": f"ws://{websocket_host}:8765",
+        "websocket_url": f"ws://{websocket_host}:{websocket_port}",
         "origin": origin,
         "expected_drone_count": int(marker["drone_count"]),
         "led_appearance": {
@@ -869,6 +890,7 @@ def patch_launcher(
     show_runner: Path,
     drone_root: Path,
     bridge_config_root: Path,
+    websocket_port: int = DEFAULT_WEBSOCKET_PORT,
     no_cache_http_server: Path | None = None,
     show_ir_path: Path | None = None,
     show_ir_max_speed_m_s: float | None = None,
@@ -881,6 +903,9 @@ def patch_launcher(
     pdu_config_path: Path | None = None,
 ) -> Path:
     launcher = _read_json(launcher_path.resolve())
+    # Shared memory left by an earlier run (another Recipe or asset layout)
+    # crashes hako-cmd on Windows; start from a clean segment.
+    launcher.setdefault("runtime", {})["cleanup_mmap_on_start"] = True
     assets = launcher.get("assets")
     if not isinstance(assets, list):
         raise ShowRuntimeError("Launcher has no assets array")
@@ -923,6 +948,8 @@ def patch_launcher(
     environment["HAKO_DRONE_ROOT"] = str(drone_root.resolve())
     runner["readiness"] = {
         "type": "hako_asset",
+        "timeout_sec": READINESS_TIMEOUT_SEC,
+        "command_timeout_sec": READINESS_PROBE_TIMEOUT_SEC,
         "asset_name": "ShowRunnerAsset",
     }
 
@@ -956,6 +983,8 @@ def patch_launcher(
             "delay_sec": 1,
             "readiness": {
                 "type": "hako_asset",
+        "timeout_sec": READINESS_TIMEOUT_SEC,
+        "command_timeout_sec": READINESS_PROBE_TIMEOUT_SEC,
                 "asset_name": "GlobalWindAsset",
             },
         }
@@ -1027,7 +1056,7 @@ def patch_launcher(
                 "--backend-host",
                 "127.0.0.1",
                 "--backend-port",
-                "8765",
+                str(int(websocket_port)),
             ],
             "cwd": http_server["cwd"],
             "depends_on": ["web-bridge-fleets"],
@@ -1051,16 +1080,22 @@ def patch_launcher(
             if name_index < len(asset_args):
                 asset["readiness"] = {
                     "type": "hako_asset",
+        "timeout_sec": READINESS_TIMEOUT_SEC,
+        "command_timeout_sec": READINESS_PROBE_TIMEOUT_SEC,
                     "asset_name": str(asset_args[name_index]),
                 }
         elif name == "visual-state-publisher":
             asset["readiness"] = {
                 "type": "hako_asset",
+        "timeout_sec": READINESS_TIMEOUT_SEC,
+        "command_timeout_sec": READINESS_PROBE_TIMEOUT_SEC,
                 "asset_name": "DroneVisualStatePublisher",
             }
         elif name == "web-bridge-fleets":
             asset["readiness"] = {
                 "type": "hako_asset",
+        "timeout_sec": READINESS_TIMEOUT_SEC,
+        "command_timeout_sec": READINESS_PROBE_TIMEOUT_SEC,
                 "asset_name": "WebBridge",
             }
     _write_json(launcher_path, launcher)

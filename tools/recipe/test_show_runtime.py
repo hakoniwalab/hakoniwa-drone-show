@@ -81,7 +81,18 @@ class ShowRuntimeTest(unittest.TestCase):
                 base / "comm" / "visual-state-shm-callback.json",
                 {"io": {"robots": [{"name": "VSP", "pdu": []}]}},
             )
+            write_json(
+                base / "comm" / "visual-state-websocket-server.json",
+                {"protocol": "websocket", "local": {"port": 8765}},
+            )
             output = show_runtime.materialize_bridge_config(base, root / "output")
+            server = json.loads((output / "comm" / "visual-state-websocket-server.json").read_text())
+            self.assertEqual(server["local"]["port"], 8765)
+            custom = show_runtime.materialize_bridge_config(
+                base, root / "custom", websocket_port=18767
+            )
+            server = json.loads((custom / "comm" / "visual-state-websocket-server.json").read_text())
+            self.assertEqual(server["local"]["port"], 18767)
             bridge = json.loads((output / "bridge" / "bridge.json").read_text())
             self.assertIn("drone_show_command", bridge["pduKeyGroups"])
             self.assertIn("drone_show_status", bridge["pduKeyGroups"])
