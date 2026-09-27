@@ -211,6 +211,10 @@ class _MujocoRayScene:
         lib.mj_makeData.argtypes = [ctypes.c_void_p]
         lib.mj_makeData.restype = ctypes.c_void_p
         lib.mj_forward.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+        # MuJoCo 3.13 (the Drone Core runtime) adds a trailing normal[3]
+        # output. Passing NULL for it is required there: without it the
+        # callee writes through an undefined pointer (the process dies on
+        # Windows). Older MuJoCo ignores the extra argument.
         lib.mj_ray.argtypes = [
             ctypes.c_void_p,
             ctypes.c_void_p,
@@ -220,6 +224,7 @@ class _MujocoRayScene:
             ctypes.c_ubyte,
             ctypes.c_int,
             ctypes.POINTER(ctypes.c_int),
+            ctypes.c_void_p,
         ]
         lib.mj_ray.restype = ctypes.c_double
         lib.mj_deleteData.argtypes = [ctypes.c_void_p]
@@ -267,6 +272,7 @@ class _MujocoRayScene:
             1,
             -1,
             ctypes.byref(geom_id),
+            None,
         )
         if distance < 0.0 or geom_id.value < 0:
             raise FleetMujocoError(

@@ -17,6 +17,45 @@ recipe = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(recipe)
 
 
+DRONE_CORE = Path(__file__).resolve().parents[3] / "hakoniwa-drone-core"
+
+
+def _drone_core_mujoco() -> Path | None:
+    try:
+        return recipe.find_mujoco_library(DRONE_CORE)
+    except Exception:  # noqa: BLE001 - the runtime is optional for this test
+        return None
+
+
+class MujocoRaySceneTest(unittest.TestCase):
+    @unittest.skipIf(_drone_core_mujoco() is None, "Drone Core MuJoCo runtime is not installed")
+    def test_ray_query_runs_on_the_drone_core_mujoco(self) -> None:
+        # MuJoCo 3.13 mj_ray takes a trailing normal[3]; calling it without
+        # that argument killed the process on Windows. Run the query in a
+        # child process so such a crash fails the test instead of the run.
+        with tempfile.TemporaryDirectory() as directory:
+            world = Path(directory) / "world.xml"
+            world.write_text(
+                '<mujoco><worldbody><geom type="plane" size="10 10 0.1"/>'
+                '<geom type="box" pos="2 0 1.5" size="1 1 1.5"/></worldbody></mujoco>',
+                encoding="utf-8",
+            )
+            script = (
+                "import importlib.util, sys\n"
+                "from pathlib import Path\n"
+                f"spec = importlib.util.spec_from_file_location('m', r'{SCRIPT}')\n"
+                "m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)\n"
+                f"with m._MujocoRayScene(Path(r'{world}'), Path(r'{_drone_core_mujoco()}')) as s:\n"
+                "    print(round(s.height(2.0, 0.0), 6), round(s.height(-5.0, 0.0), 6))\n"
+            )
+            import subprocess
+            import sys
+
+            result = subprocess.run([sys.executable, "-c", script], capture_output=True, text=True, check=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.split(), ["3.0", "0.0"])
+
+
 class FleetMujocoCityTest(unittest.TestCase):
     def test_city_position_converts_to_fleet_ned(self) -> None:
         self.assertEqual(
