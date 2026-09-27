@@ -1466,9 +1466,13 @@ def _write_show_launcher(
             else None
         ),
         pdu_config_path=pdu_config_path,
+        drone_real_sleep_msec=_DRONE_REAL_SLEEP_MSEC,
     )
 
 
+# --drone-real-sleep-msec for the Launcher written by doctor/start (None keeps
+# the Drone service default).
+_DRONE_REAL_SLEEP_MSEC: int | None = None
 base.write_launcher = _write_show_launcher
 
 
@@ -1523,6 +1527,12 @@ def parser() -> argparse.ArgumentParser:
         help="override environment.plateau.altitude_mode",
     )
     result.add_argument("--above-city-clearance-m", type=float, default=10.0)
+    result.add_argument(
+        "--drone-real-sleep-msec",
+        type=int,
+        default=None,
+        help="doctor/start: per-step sleep of each Drone service (0 when a host pacer keeps real time)",
+    )
     return result
 
 
@@ -1791,7 +1801,11 @@ def configure(args: argparse.Namespace, experiment_path: Path, drone_root: Path)
 
 
 def main(argv: list[str] | None = None) -> int:
+    global _DRONE_REAL_SLEEP_MSEC
     args = parser().parse_args(argv)
+    if args.drone_real_sleep_msec is not None and args.drone_real_sleep_msec < 0:
+        raise SystemExit("--drone-real-sleep-msec must be >= 0")
+    _DRONE_REAL_SLEEP_MSEC = args.drone_real_sleep_msec
     try:
         system_name = platform.system()
         if system_name not in base.SUPPORTED_NATIVE_SYSTEMS:

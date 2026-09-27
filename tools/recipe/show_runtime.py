@@ -891,6 +891,7 @@ def patch_launcher(
     drone_root: Path,
     bridge_config_root: Path,
     websocket_port: int = DEFAULT_WEBSOCKET_PORT,
+    drone_real_sleep_msec: int | None = None,
     no_cache_http_server: Path | None = None,
     show_ir_path: Path | None = None,
     show_ir_max_speed_m_s: float | None = None,
@@ -1071,6 +1072,18 @@ def patch_launcher(
         name = asset.get("name")
         asset_args = asset.get("args")
         if (
+            drone_real_sleep_msec is not None
+            and isinstance(name, str)
+            and name.startswith("drone-service-")
+            and isinstance(asset_args, list)
+        ):
+            # Each Drone service otherwise sleeps per 1 ms step, which Windows
+            # rounds up to its timer resolution; a host pacer keeps real time.
+            while "--real-sleep-msec" in asset_args:
+                index = asset_args.index("--real-sleep-msec")
+                del asset_args[index : index + 2]
+            asset_args.extend(["--real-sleep-msec", str(int(drone_real_sleep_msec))])
+        if (
             isinstance(name, str)
             and name.startswith("drone-service-")
             and isinstance(asset_args, list)
@@ -1098,5 +1111,11 @@ def patch_launcher(
         "command_timeout_sec": READINESS_PROBE_TIMEOUT_SEC,
                 "asset_name": "WebBridge",
             }
+    # A readiness wait already confirms registration, so the fixed pause after
+    # the asset only delays activation; with one Drone service per process it
+    # adds up past the Launcher's background start limit (60 s).
+    for asset in assets:
+        if isinstance(asset, dict) and isinstance(asset.get("readiness"), dict):
+            asset["delay_sec"] = 0
     _write_json(launcher_path, launcher)
     return launcher_path
